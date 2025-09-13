@@ -83,12 +83,9 @@ FBCon_VideoInit(_THIS)
     current_mode.h = vinfo.yres;
     /* FIXME: Is there a way to tell the actual refresh rate? */
     current_mode.refresh_rate = 60;
-    /* 32 bpp for default */
-    if (vinfo.bits_per_pixel == 32) {
-        current_mode.format = SDL_PIXELFORMAT_ABGR8888;
-    } else {
-        current_mode.format = SDL_PIXELFORMAT_RGB888;
-    }
+    /* TG2040_BITS_PER_PIXEL_16 == 16 */
+    current_mode.format = SDL_PIXELFORMAT_RGB565;
+
     data->format = current_mode.format;
 
     current_mode.driverdata = NULL;
@@ -149,13 +146,16 @@ FBCon_CreateWindow(_THIS, SDL_Window *window)
 
     SDL_PixelFormat *format = (SDL_PixelFormat *) SDL_calloc(1, sizeof(SDL_PixelFormat));
     format->format = displaydata->format;
-    format->BitsPerPixel = 32;
-    format->BytesPerPixel = 4;
-    format->Ashift = 24;
-    format->Amask = 0xffffffff;
-    format->Rshift = 16;
-    format->Gshift = 8;
-    format->Bshift = 0;
+    format->BitsPerPixel = TG2040_BITS_PER_PIXEL_16;
+    format->BytesPerPixel = TG2040_BITS_PER_PIXEL_16 / 8;
+
+    // TG2040_BITS_PER_PIXEL_16
+    // Let's assume RGB565 format
+    format->Rmask = 0xF800;
+    format->Gmask = 0x07E0;
+    format->Bmask = 0x001F;
+    // format->Ashift = 0;
+    // format->Amask = 0;
 
     SDL_BlitMap *map = (SDL_BlitMap *) SDL_calloc(1, sizeof(SDL_BlitMap));
     map->info.r = 0xFF;
