@@ -48,23 +48,12 @@ FBCon_VideoInit(_THIS)
     }
     FBD = fd;
 
-    struct fb_fix_screeninfo finfo;
-    if (ioctl(fd, FBIOGET_FSCREENINFO, &finfo) < 0) {
-        FB_VideoQuit(_this);
-        return SDL_SetError("Couldn't get console hardware info");
-    }
-
-    struct fb_var_screeninfo vinfo;
-    if (ioctl(fd, FBIOGET_VSCREENINFO, &vinfo) < 0) {
-        FB_VideoQuit(_this);
-        return SDL_SetError("Couldn't get console pixel format");
-    }
-
-    printf("fbcon vinfo, xres: %d, yres: %d, bits_per_pixel: %d\n",
-           vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
-
     /* Memory map the device, compensating for buggy PPC mmap() */
-    int mapped_memlen = vinfo.yres_virtual * finfo.line_length;
+    int mapped_memlen =
+      TG2040_SCREEN_VIRTUAL_HEIGHT_640
+      * TG2040_SCREEN_VIRTUAL_WIDTH_240
+      * TG2040_SCREEN_BYTES_PER_PIXEL_2;
+
     char *mapped_mem = do_mmap(NULL, mapped_memlen,
                                PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (mapped_mem == (char *) -1) {
@@ -73,17 +62,16 @@ FBCon_VideoInit(_THIS)
         return SDL_SetError("Unable to memory map the video hardware");
     }
 
-    data->width = vinfo.xres;
-    data->height = vinfo.yres;
+    data->width = TG2040_SCREEN_WIDTH_240;
+    data->height = TG2040_SCREEN_HEIGHT_320;
     data->mapped_mem = mapped_mem;
 
     SDL_DisplayMode current_mode;
     SDL_zero(current_mode);
-    current_mode.w = vinfo.xres;
-    current_mode.h = vinfo.yres;
-    /* FIXME: Is there a way to tell the actual refresh rate? */
-    current_mode.refresh_rate = 60;
-    /* TG2040_BITS_PER_PIXEL_16 == 16 */
+    current_mode.w = TG2040_SCREEN_WIDTH_240;
+    current_mode.h = TG2040_SCREEN_HEIGHT_320;
+    current_mode.refresh_rate = TG2040_SCREEN_REFRESH_RATE_60;
+    /* TG2040_SCREEN_BITS_PER_PIXEL_16 == 16 */
     current_mode.format = SDL_PIXELFORMAT_RGB565;
 
     data->format = current_mode.format;
@@ -146,10 +134,10 @@ FBCon_CreateWindow(_THIS, SDL_Window *window)
 
     SDL_PixelFormat *format = (SDL_PixelFormat *) SDL_calloc(1, sizeof(SDL_PixelFormat));
     format->format = displaydata->format;
-    format->BitsPerPixel = TG2040_BITS_PER_PIXEL_16;
-    format->BytesPerPixel = TG2040_BITS_PER_PIXEL_16 / 8;
+    format->BitsPerPixel = TG2040_SCREEN_BITS_PER_PIXEL_16;
+    format->BytesPerPixel = TG2040_SCREEN_BYTES_PER_PIXEL_2;
 
-    // TG2040_BITS_PER_PIXEL_16
+    // TG2040_SCREEN_BITS_PER_PIXEL_16
     // Let's assume RGB565 format
     format->Rmask = 0xF800;
     format->Gmask = 0x07E0;

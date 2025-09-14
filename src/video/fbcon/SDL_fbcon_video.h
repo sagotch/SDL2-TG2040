@@ -35,7 +35,13 @@
 /*     rgba 0/0,0/0,0/0,0/0                         */
 /* endmode                                          */
 
-#define TG2040_BITS_PER_PIXEL_16 16
+#define TG2040_SCREEN_BITS_PER_PIXEL_16 16
+#define TG2040_SCREEN_BYTES_PER_PIXEL_2 2
+#define TG2040_SCREEN_WIDTH_240 240
+#define TG2040_SCREEN_HEIGHT_320 320
+#define TG2040_SCREEN_VIRTUAL_HEIGHT_640 640
+#define TG2040_SCREEN_VIRTUAL_WIDTH_240 240
+#define TG2040_SCREEN_REFRESH_RATE_60 60
 
 typedef struct
 {
