@@ -160,7 +160,7 @@ FBCon_CreateWindow(_THIS, SDL_Window *window)
     surface->clip_rect.y = 0;
     surface->clip_rect.w = displaydata->width;
     surface->clip_rect.h = displaydata->height;
-    surface->pitch = displaydata->width * 4;
+    surface->pitch = TG2040_SCREEN_VIRTUAL_PITCH_480;
     surface->map = map;
     window->surface = surface;
     window->surface_valid = SDL_TRUE;
