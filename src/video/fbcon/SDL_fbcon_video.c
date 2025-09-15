@@ -1,88 +1,92 @@
 #include "../../SDL_internal.h"
 
-#if SDL_VIDEO_DRIVER_FBCON
+#ifndef SDL_FBCON_VIDEO
+#define SDL_FBCON_VIDEO
 
-#include "SDL_fbcon_video.h"
+#include "../../SDL_internal.h"
+#include "../SDL_sysvideo.h"
 
-/* Small wrapper for mmap() so we can play nicely with no-mmu hosts
- * (non-mmu hosts disallow the MAP_SHARED flag) */
-static void *
-do_mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset)
-{
-    void *ret = mmap(start, length, prot, flags, fd, offset);
-    if (ret == (char *) -1 && (flags & MAP_SHARED)) {
-        ret = mmap(start, length, prot,
-                   (flags & ~MAP_SHARED) | MAP_PRIVATE, fd, offset);
-    }
-    return ret;
-}
+#include "SDL_events.h"
+#include "SDL_loadso.h"
+#include "SDL_stdinc.h"
+#include "SDL_syswm.h"
+#include "SDL_version.h"
+#include "SDL_video.h"
+#include "../SDL_blit.h"
+#include "SDL_pixels.h"
+
+#include <fcntl.h>
+#include <linux/fb.h>
+#include <linux/vt.h>
+#include <stdlib.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/mman.h>
+
+#define FBCON_DRIVER_NAME "fbcon"
+
+/* /mnt/SDCARD # fbset                              */
+/*                                                  */
+/* mode "240x320-60"                                */
+/*     # D: 17.000 MHz, H: 20.757 kHz, V: 60.166 Hz */
+/*     geometry 240 320 240 640 16                  */
+/*     timings 58823 52 525 16 7 2 2                */
+/*     accel false                                  */
+/*     rgba 0/0,0/0,0/0,0/0                         */
+/* endmode                                          */
+
+#define TG2040_SCREEN_BITS_PER_PIXEL_16 16
+#define TG2040_SCREEN_BYTES_PER_PIXEL_2 \
+    TG2040_SCREEN_BITS_PER_PIXEL_16 / 8
+#define TG2040_SCREEN_WIDTH_240 240
+#define TG2040_SCREEN_HEIGHT_320 320
+#define TG2040_SCREEN_VIRTUAL_HEIGHT_640 640
+#define TG2040_SCREEN_VIRTUAL_WIDTH_240 240
+#define TG2040_SCREEN_VIRTUAL_PITCH_480 \
+    TG2040_SCREEN_VIRTUAL_WIDTH_240 *TG2040_SCREEN_BYTES_PER_PIXEL_2
+#define TG2040_SCREEN_REFRESH_RATE_60 60
+#define TG2040_PIXELFORMAT_RGB565 SDL_PIXELFORMAT_RGB565
+
+#endif /* SDL_FBCON_VIDEO */
 
 static void
 FB_DeleteDevice(_THIS)
 {
-    if (_this->driverdata != NULL) {
-        SDL_free(_this->driverdata);
-        _this->driverdata = NULL;
-    }
     SDL_free(_this);
 }
 
-static void
-FB_VideoQuit(_THIS)
-{
-}
+static int FB0_FD;
+static int FB0_MMAP_LENGTH = TG2040_SCREEN_VIRTUAL_HEIGHT_640 * TG2040_SCREEN_VIRTUAL_WIDTH_240 * TG2040_SCREEN_BYTES_PER_PIXEL_2;
+static char *FB0_MMAP;
 
-static int FBD;
-
-int
-FBCon_VideoInit(_THIS)
+int FBCon_VideoInit(_THIS)
 {
-    FBCon_DisplayData *data = (FBCon_DisplayData *) SDL_calloc(1, sizeof(FBCon_DisplayData));
-    if (data == NULL) {
-        return SDL_OutOfMemory();
+    FB0_FD = open("/dev/fb0", O_RDWR);
+    if (FB0_FD < 0)
+    {
+        return SDL_SetError("fbcon: unable to open /dev/fb0");
     }
 
-    int fd = open("/dev/fb0", O_RDWR);
-    if (fd < 0) {
-        return SDL_SetError("fbcon: unable to open %s", "/dev/fb0");
-    }
-    FBD = fd;
-
-    /* Memory map the device, compensating for buggy PPC mmap() */
-    int mapped_memlen =
-      TG2040_SCREEN_VIRTUAL_HEIGHT_640
-      * TG2040_SCREEN_VIRTUAL_WIDTH_240
-      * TG2040_SCREEN_BYTES_PER_PIXEL_2;
-
-    char *mapped_mem = do_mmap(NULL, mapped_memlen,
-                               PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (mapped_mem == (char *) -1) {
-        mapped_mem = NULL;
-        FB_VideoQuit(_this);
+    FB0_MMAP = mmap(NULL, FB0_MMAP_LENGTH, PROT_READ | PROT_WRITE, MAP_SHARED, FB0_FD, 0);
+    if (FB0_MMAP == (char *)-1)
+    {
+        FB0_MMAP = NULL;
         return SDL_SetError("Unable to memory map the video hardware");
     }
 
-    data->width = TG2040_SCREEN_WIDTH_240;
-    data->height = TG2040_SCREEN_HEIGHT_320;
-    data->mapped_mem = mapped_mem;
-
-    SDL_DisplayMode current_mode;
-    SDL_zero(current_mode);
-    current_mode.w = TG2040_SCREEN_WIDTH_240;
-    current_mode.h = TG2040_SCREEN_HEIGHT_320;
-    current_mode.refresh_rate = TG2040_SCREEN_REFRESH_RATE_60;
-    /* TG2040_SCREEN_BITS_PER_PIXEL_16 == 16 */
-    current_mode.format = SDL_PIXELFORMAT_RGB565;
-
-    data->format = current_mode.format;
-
-    current_mode.driverdata = NULL;
+    SDL_DisplayMode display_mode;
+    SDL_zero(display_mode);
+    display_mode.w = TG2040_SCREEN_WIDTH_240;
+    display_mode.h = TG2040_SCREEN_HEIGHT_320;
+    display_mode.refresh_rate = TG2040_SCREEN_REFRESH_RATE_60;
+    display_mode.format = TG2040_PIXELFORMAT_RGB565;
 
     SDL_VideoDisplay display;
     SDL_zero(display);
-    display.desktop_mode = current_mode;
-    display.current_mode = current_mode;
-    display.driverdata = data;
+    display.desktop_mode = display_mode;
+    display.current_mode = display_mode;
 
     SDL_AddVideoDisplay(&display, SDL_FALSE);
 
@@ -91,123 +95,94 @@ FBCon_VideoInit(_THIS)
     return 0;
 }
 
-void
-FBCon_VideoQuit(_THIS)
+void FBCon_VideoQuit(_THIS)
+{
+    if (FB0_BUFFER != NULL)
+    {
+        SDL_free(FB0_BUFFER);
+        FB0_BUFFER = NULL;
+    }
+    if (FB0_MMAP != NULL)
+    {
+        munmap(FB0_MMAP, FB0_MMAP_LENGTH);
+        FB0_MMAP = NULL;
+    }
+    if (FB0_FD >= 0)
+    {
+        close(FB0_FD);
+        FB0_FD = -1;
+    }
+}
+
+void FBCon_GetDisplayModes(_THIS, SDL_VideoDisplay *display)
 {
 }
 
-void
-FBCon_GetDisplayModes(_THIS, SDL_VideoDisplay *display)
-{
-    /* Only one display mode available, the current one */
-    SDL_AddDisplayMode(display, &display->current_mode);
-}
-
-int
-FBCon_SetDisplayMode(_THIS, SDL_VideoDisplay *display, SDL_DisplayMode *mode)
+int FBCon_SetDisplayMode(_THIS, SDL_VideoDisplay *display, SDL_DisplayMode *mode)
 {
     return 0;
 }
 
-int
-FBCon_CreateWindow(_THIS, SDL_Window *window)
+int FBCon_CreateWindow(_THIS, SDL_Window *window)
 {
-    FBCon_DisplayData *displaydata = SDL_GetDisplayDriverData(0);
-
-    /* Allocate window internal data */
-    FBCon_WindowData *windowdata = (FBCon_WindowData *) SDL_calloc(1, sizeof(FBCon_WindowData));
-    if (windowdata == NULL) {
-        return SDL_OutOfMemory();
-    }
-
     /* Always fullscreen */
     window->flags |= SDL_WINDOW_FULLSCREEN;
     window->flags |= SDL_WINDOW_SHOWN;
     window->is_hiding = SDL_TRUE;
 
-    window->w = displaydata->width;
-    window->h = displaydata->height;
-    windowdata->mmaped_mem = displaydata->mapped_mem;
+    window->w = TG2040_SCREEN_WIDTH_240;
+    window->h = TG2040_SCREEN_HEIGHT_320;
 
-    /* Setup driver data for this window */
-    window->driverdata = windowdata;
-
-    SDL_PixelFormat *format = (SDL_PixelFormat *) SDL_calloc(1, sizeof(SDL_PixelFormat));
-    format->format = displaydata->format;
+    SDL_PixelFormat *format = (SDL_PixelFormat *)SDL_calloc(1, sizeof(SDL_PixelFormat));
+    format->format = TG2040_PIXELFORMAT_RGB565;
     format->BitsPerPixel = TG2040_SCREEN_BITS_PER_PIXEL_16;
     format->BytesPerPixel = TG2040_SCREEN_BYTES_PER_PIXEL_2;
-
-    // TG2040_SCREEN_BITS_PER_PIXEL_16
-    // Let's assume RGB565 format
     format->Rmask = 0xF800;
     format->Gmask = 0x07E0;
     format->Bmask = 0x001F;
-    // format->Ashift = 0;
-    // format->Amask = 0;
 
-    SDL_BlitMap *map = (SDL_BlitMap *) SDL_calloc(1, sizeof(SDL_BlitMap));
-    map->info.r = 0xFF;
-    map->info.g = 0xFF;
-    map->info.b = 0xFF;
-    map->info.a = 0xFF;
-
-    SDL_Surface *surface = (SDL_Surface *) SDL_calloc(1, sizeof(SDL_Surface));
+    SDL_Surface *surface = (SDL_Surface *)SDL_calloc(1, sizeof(SDL_Surface));
     surface->format = format;
-    surface->w = displaydata->width;
-    surface->h = displaydata->height;
-    surface->pixels = displaydata->mapped_mem;
+    surface->w = TG2040_SCREEN_WIDTH_240;
+    surface->h = TG2040_SCREEN_HEIGHT_320;
+    // Write directly on /dev/fb0
+    surface->pixels = FB0_MMAP;
     surface->clip_rect.x = 0;
     surface->clip_rect.y = 0;
-    surface->clip_rect.w = displaydata->width;
-    surface->clip_rect.h = displaydata->height;
+    surface->clip_rect.w = TG2040_SCREEN_WIDTH_240;
+    surface->clip_rect.h = TG2040_SCREEN_HEIGHT_320;
     surface->pitch = TG2040_SCREEN_VIRTUAL_PITCH_480;
-    surface->map = map;
+    surface->map = (SDL_BlitMap *)SDL_calloc(1, sizeof(SDL_BlitMap));
+
     window->surface = surface;
     window->surface_valid = SDL_TRUE;
-
-    /* One window, it always has focus */
-    // SDL_SetMouseFocus(window);
-    // SDL_SetKeyboardFocus(window);
 
     /* Window has been successfully created */
     printf("FBCon_CreateWindow done.\n");
     return 0;
 }
 
-void
-FBCon_DestroyWindow(_THIS, SDL_Window *window)
-{
-    FBCon_WindowData *data;
-
-    data = window->driverdata;
-    if (data) {
-        SDL_free(data);
-    }
-    window->driverdata = NULL;
-}
-
-void
-FBCon_SetWindowTitle(_THIS, SDL_Window *window)
+void FBCon_DestroyWindow(_THIS, SDL_Window *window)
 {
 }
 
-void
-FBCon_SetWindowPosition(_THIS, SDL_Window *window)
+void FBCon_SetWindowTitle(_THIS, SDL_Window *window)
 {
 }
 
-void
-FBCon_SetWindowSize(_THIS, SDL_Window *window)
+void FBCon_SetWindowPosition(_THIS, SDL_Window *window)
 {
 }
 
-void
-FBCon_ShowWindow(_THIS, SDL_Window *window)
+void FBCon_SetWindowSize(_THIS, SDL_Window *window)
 {
 }
 
-void
-FBCon_HideWindow(_THIS, SDL_Window *window)
+void FBCon_ShowWindow(_THIS, SDL_Window *window)
+{
+}
+
+void FBCon_HideWindow(_THIS, SDL_Window *window)
 {
 }
 
@@ -217,9 +192,12 @@ FBCon_HideWindow(_THIS, SDL_Window *window)
 SDL_bool
 FBCon_GetWindowWMInfo(_THIS, SDL_Window *window, struct SDL_SysWMinfo *info)
 {
-    if (info->version.major <= SDL_MAJOR_VERSION) {
+    if (info->version.major <= SDL_MAJOR_VERSION)
+    {
         return SDL_TRUE;
-    } else {
+    }
+    else
+    {
         SDL_SetError("application not compiled with SDL %d.%d\n",
                      SDL_MAJOR_VERSION, SDL_MINOR_VERSION);
     }
@@ -228,40 +206,13 @@ FBCon_GetWindowWMInfo(_THIS, SDL_Window *window, struct SDL_SysWMinfo *info)
     return SDL_FALSE;
 }
 
-void
-FBCon_PumpEvents(_THIS)
+void FBCon_PumpEvents(_THIS)
 {
 }
 
-int
-FBCon_UpdateWindowFramebuffer(_THIS, SDL_Window *window, const SDL_Rect *rects, int numrects)
+int FBCon_UpdateWindowFramebuffer(_THIS, SDL_Window *window, const SDL_Rect *rects, int numrects)
 {
-    return 0;
-
-    FBCon_WindowData *windowdata = (FBCon_WindowData *) window->driverdata;
-    // printf("rect, x: %d, y: %d, w: %d, h: %d", rects->x, rects->y, rects->w, rects->h);
-
-    char *buffer = (char *) SDL_malloc(768*4096);
-    SDL_memcpy(windowdata->mmaped_mem, buffer, 768*4096);
-    SDL_free(buffer);
-
-    // int fd = open("/dev/urandom", O_RDONLY);
-    // if (fd == -1) {
-    //     return SDL_SetError("open file failed");
-    // }
-    // read(fd, &buffer, rects->x * rects->y * 32);
-    // close(fd);
-
-    // int fd = open("/dev/fb0", O_WRONLY);
-    // if (fd < 0) {
-    //     return SDL_SetError("fbcon: unable to open %s", "/dev/fb0");
-    // }
-    // int ret = write(fd, buffer, rects->x * rects->y * 32);
-    // if (ret == -1) {
-    //     return SDL_SetError("fuck");
-    // }
-    // close(fd);
-
+    /* /dev/fb0 is directly mmap, there is nothing to do here */
     return 0;
 }
 
@@ -271,13 +222,12 @@ FBCon_CreateDevice(void)
     SDL_VideoDevice *device;
 
     /* Initialize SDL_VideoDevice structure */
-    device = (SDL_VideoDevice *) SDL_calloc(1, sizeof(SDL_VideoDevice));
-    if (device == NULL) {
+    device = (SDL_VideoDevice *)SDL_calloc(1, sizeof(SDL_VideoDevice));
+    if (device == NULL)
+    {
         SDL_OutOfMemory();
         return NULL;
     }
-
-    device->driverdata = NULL;
 
     /* Setup amount of available displays and current display */
     device->num_displays = 0;
@@ -306,7 +256,4 @@ FBCon_CreateDevice(void)
 
 VideoBootStrap FBCon_bootstrap = {
     FBCON_DRIVER_NAME, "SDL fbcon video driver",
-    FBCon_CreateDevice
-};
-
-#endif /* SDL_VIDEO_DRIVER_FBCON */
+    FBCon_CreateDevice};
