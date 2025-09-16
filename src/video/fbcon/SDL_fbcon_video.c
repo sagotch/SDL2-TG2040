@@ -255,6 +255,7 @@ int FBCon_UpdateWindowFramebuffer(_THIS, SDL_Window *window, const SDL_Rect *rec
         int x = 0;
 
         // Process 8 pixels per iteration using NEON
+#pragma unroll // hint compiler to unroll this loop fully
         for (; x <= src_w - 8; x += 8)
         {
             // Load 8 pixels from src (contiguous)
