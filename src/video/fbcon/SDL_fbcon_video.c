@@ -25,6 +25,8 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
+#include <arm_neon.h>
+
 #define FBCON_DRIVER_NAME "fbcon"
 
 /* /mnt/SDCARD # fbset                              */
@@ -244,14 +246,41 @@ int FBCon_UpdateWindowFramebuffer(_THIS, SDL_Window *window, const SDL_Rect *rec
     int src_w_idx = src_w - 1;
     int src_h = TG2040_SCREEN_WIDTH_240;
     int dst_w = TG2040_SCREEN_WIDTH_240;
-    int dst_h = TG2040_SCREEN_HEIGHT_320;
 
-    for (int y = 0; y < src_h; y++) {
+    for (int y = 0; y < src_h; y++)
+    {
         Uint16 *src_row = src + y * src_w;
         Uint16 *dst_col = dst + y;
-        for (int x = 0; x < src_w; x++) {
-            int dy = src_w_idx - x;
-            dst_col[dy * dst_w] = src_row[x];
+
+        int x = 0;
+
+        // Process 8 pixels per iteration using NEON
+        for (; x <= src_w - 8; x += 8)
+        {
+            // Load 8 pixels from src (contiguous)
+            uint16x8_t pixels = vld1q_u16(src_row + x);
+
+            // Extract to scalars
+            uint16_t p0 = vgetq_lane_u16(pixels, 0);
+            uint16_t p1 = vgetq_lane_u16(pixels, 1);
+            uint16_t p2 = vgetq_lane_u16(pixels, 2);
+            uint16_t p3 = vgetq_lane_u16(pixels, 3);
+            uint16_t p4 = vgetq_lane_u16(pixels, 4);
+            uint16_t p5 = vgetq_lane_u16(pixels, 5);
+            uint16_t p6 = vgetq_lane_u16(pixels, 6);
+            uint16_t p7 = vgetq_lane_u16(pixels, 7);
+
+            int base_dy = src_w_idx - x;
+
+            // Scatter stores
+            dst_col[(base_dy - 0) * dst_w] = p0;
+            dst_col[(base_dy - 1) * dst_w] = p1;
+            dst_col[(base_dy - 2) * dst_w] = p2;
+            dst_col[(base_dy - 3) * dst_w] = p3;
+            dst_col[(base_dy - 4) * dst_w] = p4;
+            dst_col[(base_dy - 5) * dst_w] = p5;
+            dst_col[(base_dy - 6) * dst_w] = p6;
+            dst_col[(base_dy - 7) * dst_w] = p7;
         }
     }
 
