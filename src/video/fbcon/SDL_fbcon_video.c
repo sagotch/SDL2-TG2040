@@ -14,6 +14,8 @@
 #include "SDL_video.h"
 #include "../SDL_blit.h"
 #include "SDL_pixels.h"
+#include "../../core/linux/SDL_evdev_capabilities.h"
+#include "../../core/linux/SDL_evdev.h"
 
 #include <fcntl.h>
 #include <linux/fb.h>
@@ -65,17 +67,41 @@ static char *FB0_MMAP = NULL;
 static int FB0_BUFFER_LENGTH = TG2040_SCREEN_HEIGHT_320 * TG2040_SCREEN_WIDTH_240 * TG2040_SCREEN_BYTES_PER_PIXEL_2;
 static char *FB0_BUFFER = NULL;
 
+void FBCon_Clean()
+{
+    if (FB0_BUFFER != NULL)
+    {
+        SDL_free(FB0_BUFFER);
+        FB0_BUFFER = NULL;
+    }
+    if (FB0_MMAP != NULL)
+    {
+        munmap(FB0_MMAP, FB0_MMAP_LENGTH);
+        FB0_MMAP = NULL;
+    }
+    if (FB0_FD >= 0)
+    {
+        close(FB0_FD);
+        FB0_FD = -1;
+    }
+
+    SDL_EVDEV_Quit();
+}
+
+
 int FBCon_VideoInit(_THIS)
 {
     FB0_FD = open("/dev/fb0", O_RDWR);
     if (FB0_FD < 0)
     {
+        FBCon_Clean();
         return SDL_SetError("fbcon: unable to open /dev/fb0");
     }
 
     FB0_MMAP = mmap(NULL, FB0_MMAP_LENGTH, PROT_READ | PROT_WRITE, MAP_SHARED, FB0_FD, 0);
     if (FB0_MMAP == (char *)-1)
     {
+        FBCon_Clean();
         FB0_MMAP = NULL;
         return SDL_SetError("Unable to memory map the video hardware");
     }
@@ -83,6 +109,7 @@ int FBCon_VideoInit(_THIS)
     FB0_BUFFER = SDL_calloc(1, FB0_BUFFER_LENGTH);
     if (FB0_BUFFER == NULL)
     {
+        FBCon_Clean();
         munmap(FB0_MMAP, FB0_MMAP_LENGTH);
         FB0_MMAP = NULL;
         return SDL_SetError("Unable to allocate temporary video buffer");
@@ -105,26 +132,19 @@ int FBCon_VideoInit(_THIS)
 
     _this->checked_texture_framebuffer = SDL_TRUE;
 
+    if (SDL_EVDEV_Init() < 0)
+    {
+        FBCon_Clean();
+        return SDL_SetError("Unable to SDL_EVDEV_Init");
+    }
+    SDL_EVDEV_device_added("/dev/input/event0", SDL_UDEV_DEVICE_KEYBOARD);
+
     return 0;
 }
 
 void FBCon_VideoQuit(_THIS)
 {
-    if (FB0_BUFFER != NULL)
-    {
-        SDL_free(FB0_BUFFER);
-        FB0_BUFFER = NULL;
-    }
-    if (FB0_MMAP != NULL)
-    {
-        munmap(FB0_MMAP, FB0_MMAP_LENGTH);
-        FB0_MMAP = NULL;
-    }
-    if (FB0_FD >= 0)
-    {
-        close(FB0_FD);
-        FB0_FD = -1;
-    }
+    FBCon_Clean();
 }
 
 void FBCon_GetDisplayModes(_THIS, SDL_VideoDisplay *display)
@@ -233,6 +253,7 @@ FBCon_GetWindowWMInfo(_THIS, SDL_Window *window, struct SDL_SysWMinfo *info)
 
 void FBCon_PumpEvents(_THIS)
 {
+    SDL_EVDEV_Poll();
 }
 
 // Portable "vtrnq_u64" for ARMv7

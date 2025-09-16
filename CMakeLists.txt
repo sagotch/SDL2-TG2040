@@ -1450,12 +1450,8 @@ elseif(UNIX AND NOT APPLE AND NOT RISCOS AND NOT HAIKU)
     file(GLOB CORE_UNIX_SOURCES ${SDL2_SOURCE_DIR}/src/core/unix/*.c)
     list(APPEND SOURCE_FILES ${CORE_UNIX_SOURCES})
 
-    check_c_source_compiles("
-        #include <linux/input.h>
-        #ifndef EVIOCGNAME
-        #error EVIOCGNAME() ioctl not available
-        #endif
-        int main(int argc, char** argv) { return 0; }" HAVE_INPUT_EVENTS)
+    set(HAVE_INPUT_EVENTS TRUE)
+    set(SDL_INPUT_LINUXEV 1)
 
     if(LINUX)
       check_c_source_compiles("
@@ -1477,10 +1473,6 @@ elseif(UNIX AND NOT APPLE AND NOT RISCOS AND NOT HAIKU)
               ioctl(0, KDENABIO, 1);
               return 0;
           }" HAVE_INPUT_KBIO)
-    endif()
-
-    if(HAVE_INPUT_EVENTS)
-      set(SDL_INPUT_LINUXEV 1)
     endif()
 
     if(SDL_HAPTIC AND HAVE_INPUT_EVENTS)
