@@ -88,8 +88,9 @@ int FBCon_VideoInit(_THIS)
 
     SDL_DisplayMode display_mode;
     SDL_zero(display_mode);
-    display_mode.w = TG2040_SCREEN_WIDTH_240;
-    display_mode.h = TG2040_SCREEN_HEIGHT_320;
+    // TG2040 screen is 240x320 screen rotated 90deg clockwise
+    display_mode.w = TG2040_SCREEN_HEIGHT_320;
+    display_mode.h = TG2040_SCREEN_WIDTH_240;
     display_mode.refresh_rate = TG2040_SCREEN_REFRESH_RATE_60;
     display_mode.format = TG2040_PIXELFORMAT_RGB565;
 
@@ -140,8 +141,9 @@ int FBCon_CreateWindow(_THIS, SDL_Window *window)
     window->flags |= SDL_WINDOW_SHOWN;
     window->is_hiding = SDL_TRUE;
 
-    window->w = TG2040_SCREEN_WIDTH_240;
-    window->h = TG2040_SCREEN_HEIGHT_320;
+    // TG2040 screen is 240x320 screen rotated 90deg clockwise
+    window->w = TG2040_SCREEN_HEIGHT_320;
+    window->h = TG2040_SCREEN_WIDTH_240;
 
     SDL_PixelFormat *format = (SDL_PixelFormat *)SDL_calloc(1, sizeof(SDL_PixelFormat));
     format->format = TG2040_PIXELFORMAT_RGB565;
@@ -155,14 +157,15 @@ int FBCon_CreateWindow(_THIS, SDL_Window *window)
     // Display on actual device will we handheld in FBCon_UpdateWindowFramebuffer.
     SDL_Surface *surface = (SDL_Surface *)SDL_calloc(1, sizeof(SDL_Surface));
     surface->format = format;
-    surface->w = TG2040_SCREEN_WIDTH_240;
-    surface->h = TG2040_SCREEN_HEIGHT_320;
+    // TG2040 screen is 240x320 screen rotated 90deg clockwise
+    surface->w = TG2040_SCREEN_HEIGHT_320;
+    surface->h = TG2040_SCREEN_WIDTH_240;
     surface->pixels = FB0_BUFFER;
     surface->clip_rect.x = 0;
     surface->clip_rect.y = 0;
-    surface->clip_rect.w = TG2040_SCREEN_WIDTH_240;
-    surface->clip_rect.h = TG2040_SCREEN_HEIGHT_320;
-    surface->pitch = TG2040_SCREEN_WIDTH_240 * TG2040_SCREEN_BYTES_PER_PIXEL_2; // Pitch for the temporary buffer
+    surface->clip_rect.w = TG2040_SCREEN_HEIGHT_320;
+    surface->clip_rect.h = TG2040_SCREEN_WIDTH_240;
+    surface->pitch = TG2040_SCREEN_HEIGHT_320 * TG2040_SCREEN_BYTES_PER_PIXEL_2;
     surface->map = (SDL_BlitMap *)SDL_calloc(1, sizeof(SDL_BlitMap));
 
     window->surface = surface;
@@ -232,11 +235,26 @@ void FBCon_PumpEvents(_THIS)
 
 int FBCon_UpdateWindowFramebuffer(_THIS, SDL_Window *window, const SDL_Rect *rects, int numrects)
 {
-    // Copy the temporary buffer to the fb0 mmap
-    if (FB0_MMAP && window->surface && window->surface->pixels)
+    // Source: 320x240 pixels (16-bit)
+    Uint16 *src = (Uint16 *)window->surface->pixels;
+    // Destination: 240x320 pixels (16-bit)
+    Uint16 *dst = (Uint16 *)FB0_MMAP;
+
+    int src_w = TG2040_SCREEN_HEIGHT_320;
+    int src_h = TG2040_SCREEN_WIDTH_240;
+    int dst_w = TG2040_SCREEN_WIDTH_240;
+    int dst_h = TG2040_SCREEN_HEIGHT_320;
+
+    for (int y = 0; y < src_h; y++)
     {
-        memcpy(FB0_MMAP, window->surface->pixels, FB0_BUFFER_LENGTH);
+        for (int x = 0; x < src_w; x++)
+        {
+            int src_idx = y * src_w + x;
+            int dst_idx = y + ((src_w - 1) - x) * dst_w;
+            dst[dst_idx] = src[src_idx];
+        }
     }
+
     return 0;
 }
 
