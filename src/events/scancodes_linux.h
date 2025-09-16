@@ -55,7 +55,8 @@ static SDL_Scancode const linux_scancode_table[] = {
     /*  26, 0x01a */    SDL_SCANCODE_LEFTBRACKET,       /* KEY_LEFTBRACE */
     /*  27, 0x01b */    SDL_SCANCODE_RIGHTBRACKET,      /* KEY_RIGHTBRACE */
     /*  28, 0x01c */    SDL_SCANCODE_RETURN,            /* KEY_ENTER */
-    /*  29, 0x01d */    SDL_SCANCODE_LCTRL,             /* KEY_LEFTCTRL */
+    /*  29, 0x01d */    /* SDL_SCANCODE_LCTRL, */       /* KEY_LEFTCTRL */
+    /*  29, 0x01d */    SDL_SCANCODE_X,                 /* KEY_LEFTCTRL */
     /*  30, 0x01e */    SDL_SCANCODE_A,                 /* KEY_A */
     /*  31, 0x01f */    SDL_SCANCODE_S,                 /* KEY_S */
     /*  32, 0x020 */    SDL_SCANCODE_D,                 /* KEY_D */
@@ -83,7 +84,8 @@ static SDL_Scancode const linux_scancode_table[] = {
     /*  54, 0x036 */    SDL_SCANCODE_RSHIFT,            /* KEY_RIGHTSHIFT */
     /*  55, 0x037 */    SDL_SCANCODE_KP_MULTIPLY,       /* KEY_KPASTERISK */
     /*  56, 0x038 */    SDL_SCANCODE_LALT,              /* KEY_LEFTALT */
-    /*  57, 0x039 */    SDL_SCANCODE_SPACE,             /* KEY_SPACE */
+    /*  57, 0x039 */    /* SDL_SCANCODE_SPACE, */       /* KEY_SPACE */
+    /*  57, 0x039 */    SDL_SCANCODE_Z,                 /* KEY_SPACE */
     /*  58, 0x03a */    SDL_SCANCODE_CAPSLOCK,          /* KEY_CAPSLOCK */
     /*  59, 0x03b */    SDL_SCANCODE_F1,                /* KEY_F1 */
     /*  60, 0x03c */    SDL_SCANCODE_F2,                /* KEY_F2 */

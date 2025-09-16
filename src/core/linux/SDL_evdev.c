@@ -123,7 +123,6 @@ static SDL_Scancode SDL_EVDEV_translate_keycode(int keycode);
 static void SDL_EVDEV_sync_device(SDL_evdevlist_item *item);
 static int SDL_EVDEV_device_removed(const char *dev_path);
 
-static int SDL_EVDEV_device_added(const char *dev_path, int udev_class);
 #if SDL_USE_LIBUDEV
 static void SDL_EVDEV_udev_callback(SDL_UDEV_deviceevent udev_type, int udev_class,
     const char *dev_path);
@@ -764,7 +763,7 @@ SDL_EVDEV_sync_device(SDL_evdevlist_item *item)
 #endif /* EVIOCGMTSLOTS */
 }
 
-static int
+int
 SDL_EVDEV_device_added(const char *dev_path, int udev_class)
 {
     int ret;
