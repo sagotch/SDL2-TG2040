@@ -59,7 +59,9 @@ FB_DeleteDevice(_THIS)
 
 static int FB0_FD;
 static int FB0_MMAP_LENGTH = TG2040_SCREEN_VIRTUAL_HEIGHT_640 * TG2040_SCREEN_VIRTUAL_WIDTH_240 * TG2040_SCREEN_BYTES_PER_PIXEL_2;
-static char *FB0_MMAP;
+static char *FB0_MMAP = NULL;
+static int FB0_BUFFER_LENGTH = TG2040_SCREEN_HEIGHT_320 * TG2040_SCREEN_WIDTH_240 * TG2040_SCREEN_BYTES_PER_PIXEL_2;
+static char *FB0_BUFFER = NULL;
 
 int FBCon_VideoInit(_THIS)
 {
@@ -74,6 +76,14 @@ int FBCon_VideoInit(_THIS)
     {
         FB0_MMAP = NULL;
         return SDL_SetError("Unable to memory map the video hardware");
+    }
+
+    FB0_BUFFER = SDL_calloc(1, FB0_BUFFER_LENGTH);
+    if (FB0_BUFFER == NULL)
+    {
+        munmap(FB0_MMAP, FB0_MMAP_LENGTH);
+        FB0_MMAP = NULL;
+        return SDL_SetError("Unable to allocate temporary video buffer");
     }
 
     SDL_DisplayMode display_mode;
@@ -141,17 +151,18 @@ int FBCon_CreateWindow(_THIS, SDL_Window *window)
     format->Gmask = 0x07E0;
     format->Bmask = 0x001F;
 
+    // The surface will write in the buffer.
+    // Display on actual device will we handheld in FBCon_UpdateWindowFramebuffer.
     SDL_Surface *surface = (SDL_Surface *)SDL_calloc(1, sizeof(SDL_Surface));
     surface->format = format;
     surface->w = TG2040_SCREEN_WIDTH_240;
     surface->h = TG2040_SCREEN_HEIGHT_320;
-    // Write directly on /dev/fb0
-    surface->pixels = FB0_MMAP;
+    surface->pixels = FB0_BUFFER;
     surface->clip_rect.x = 0;
     surface->clip_rect.y = 0;
     surface->clip_rect.w = TG2040_SCREEN_WIDTH_240;
     surface->clip_rect.h = TG2040_SCREEN_HEIGHT_320;
-    surface->pitch = TG2040_SCREEN_VIRTUAL_PITCH_480;
+    surface->pitch = TG2040_SCREEN_WIDTH_240 * TG2040_SCREEN_BYTES_PER_PIXEL_2; // Pitch for the temporary buffer
     surface->map = (SDL_BlitMap *)SDL_calloc(1, sizeof(SDL_BlitMap));
 
     window->surface = surface;
@@ -164,6 +175,15 @@ int FBCon_CreateWindow(_THIS, SDL_Window *window)
 
 void FBCon_DestroyWindow(_THIS, SDL_Window *window)
 {
+    if (window->surface != NULL)
+    {
+        SDL_free(window->surface->map);
+        window->surface->map = NULL;
+        SDL_free(window->surface->format);
+        window->surface->format = NULL;
+        SDL_free(window->surface);
+        window->surface = NULL;
+    }
 }
 
 void FBCon_SetWindowTitle(_THIS, SDL_Window *window)
@@ -212,7 +232,11 @@ void FBCon_PumpEvents(_THIS)
 
 int FBCon_UpdateWindowFramebuffer(_THIS, SDL_Window *window, const SDL_Rect *rects, int numrects)
 {
-    /* /dev/fb0 is directly mmap, there is nothing to do here */
+    // Copy the temporary buffer to the fb0 mmap
+    if (FB0_MMAP && window->surface && window->surface->pixels)
+    {
+        memcpy(FB0_MMAP, window->surface->pixels, FB0_BUFFER_LENGTH);
+    }
     return 0;
 }
 
