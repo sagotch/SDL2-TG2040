@@ -241,17 +241,17 @@ int FBCon_UpdateWindowFramebuffer(_THIS, SDL_Window *window, const SDL_Rect *rec
     Uint16 *dst = (Uint16 *)FB0_MMAP;
 
     int src_w = TG2040_SCREEN_HEIGHT_320;
+    int src_w_idx = src_w - 1;
     int src_h = TG2040_SCREEN_WIDTH_240;
     int dst_w = TG2040_SCREEN_WIDTH_240;
     int dst_h = TG2040_SCREEN_HEIGHT_320;
 
-    for (int y = 0; y < src_h; y++)
-    {
-        for (int x = 0; x < src_w; x++)
-        {
-            int src_idx = y * src_w + x;
-            int dst_idx = y + ((src_w - 1) - x) * dst_w;
-            dst[dst_idx] = src[src_idx];
+    for (int y = 0; y < src_h; y++) {
+        Uint16 *src_row = src + y * src_w;
+        Uint16 *dst_col = dst + y;
+        for (int x = 0; x < src_w; x++) {
+            int dy = src_w_idx - x;
+            dst_col[dy * dst_w] = src_row[x];
         }
     }
 
