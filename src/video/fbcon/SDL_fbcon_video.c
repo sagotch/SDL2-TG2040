@@ -235,6 +235,50 @@ void FBCon_PumpEvents(_THIS)
 {
 }
 
+// Portable "vtrnq_u64" for ARMv7
+static inline uint64x2x2_t vtrnq_u64_compat(uint64x2_t a, uint64x2_t b)
+{
+    uint64x2x2_t res;
+    res.val[0] = vcombine_u64(vget_low_u64(a), vget_low_u64(b));
+    res.val[1] = vcombine_u64(vget_high_u64(a), vget_high_u64(b));
+    return res;
+}
+
+// Transpose 8x8 block of 16-bit values
+static inline void transpose8x8_u16(
+    uint16x8_t r0, uint16x8_t r1, uint16x8_t r2, uint16x8_t r3,
+    uint16x8_t r4, uint16x8_t r5, uint16x8_t r6, uint16x8_t r7,
+    uint16x8_t out[8])
+{
+    // Step 1: 16-bit interleave
+    uint16x8x2_t t0 = vtrnq_u16(r0, r1);
+    uint16x8x2_t t1 = vtrnq_u16(r2, r3);
+    uint16x8x2_t t2 = vtrnq_u16(r4, r5);
+    uint16x8x2_t t3 = vtrnq_u16(r6, r7);
+
+    // Step 2: 32-bit interleave
+    uint32x4x2_t s0 = vtrnq_u32(vreinterpretq_u32_u16(t0.val[0]), vreinterpretq_u32_u16(t1.val[0]));
+    uint32x4x2_t s1 = vtrnq_u32(vreinterpretq_u32_u16(t0.val[1]), vreinterpretq_u32_u16(t1.val[1]));
+    uint32x4x2_t s2 = vtrnq_u32(vreinterpretq_u32_u16(t2.val[0]), vreinterpretq_u32_u16(t3.val[0]));
+    uint32x4x2_t s3 = vtrnq_u32(vreinterpretq_u32_u16(t2.val[1]), vreinterpretq_u32_u16(t3.val[1]));
+
+    // Step 3: 64-bit interleave (manual implementation)
+    uint64x2x2_t u0 = vtrnq_u64_compat(vreinterpretq_u64_u32(s0.val[0]), vreinterpretq_u64_u32(s2.val[0]));
+    uint64x2x2_t u1 = vtrnq_u64_compat(vreinterpretq_u64_u32(s0.val[1]), vreinterpretq_u64_u32(s2.val[1]));
+    uint64x2x2_t u2 = vtrnq_u64_compat(vreinterpretq_u64_u32(s1.val[0]), vreinterpretq_u64_u32(s3.val[0]));
+    uint64x2x2_t u3 = vtrnq_u64_compat(vreinterpretq_u64_u32(s1.val[1]), vreinterpretq_u64_u32(s3.val[1]));
+
+    // Collect 8 transposed rows
+    out[0] = vreinterpretq_u16_u64(u0.val[0]);
+    out[1] = vreinterpretq_u16_u64(u2.val[0]);
+    out[2] = vreinterpretq_u16_u64(u1.val[0]);
+    out[3] = vreinterpretq_u16_u64(u3.val[0]);
+    out[4] = vreinterpretq_u16_u64(u0.val[1]);
+    out[5] = vreinterpretq_u16_u64(u2.val[1]);
+    out[6] = vreinterpretq_u16_u64(u1.val[1]);
+    out[7] = vreinterpretq_u16_u64(u3.val[1]);
+}
+
 int FBCon_UpdateWindowFramebuffer(_THIS, SDL_Window *window, const SDL_Rect *rects, int numrects)
 {
     // Source: 320x240 pixels (16-bit)
@@ -247,41 +291,31 @@ int FBCon_UpdateWindowFramebuffer(_THIS, SDL_Window *window, const SDL_Rect *rec
     int src_h = TG2040_SCREEN_WIDTH_240;
     int dst_w = TG2040_SCREEN_WIDTH_240;
 
-    for (int y = 0; y < src_h; y++)
+    // Process 8x8 tiles: x across width, y across height
+    for (int y = 0; y < src_h; y += 8)
     {
-        Uint16 *src_row = src + y * src_w;
-        Uint16 *dst_col = dst + y;
-
-        int x = 0;
-
-        // Process 8 pixels per iteration using NEON
-#pragma unroll // hint compiler to unroll this loop fully
-        for (; x <= src_w - 8; x += 8)
+        Uint16 *base_dst = dst + y;
+        for (int x = 0; x < src_w; x += 8)
         {
-            // Load 8 pixels from src (contiguous)
-            uint16x8_t pixels = vld1q_u16(src_row + x);
+            Uint16 *base_src = src + x;
+            uint16x8_t r0 = vld1q_u16(base_src + (y + 0) * src_w);
+            uint16x8_t r1 = vld1q_u16(base_src + (y + 1) * src_w);
+            uint16x8_t r2 = vld1q_u16(base_src + (y + 2) * src_w);
+            uint16x8_t r3 = vld1q_u16(base_src + (y + 3) * src_w);
+            uint16x8_t r4 = vld1q_u16(base_src + (y + 4) * src_w);
+            uint16x8_t r5 = vld1q_u16(base_src + (y + 5) * src_w);
+            uint16x8_t r6 = vld1q_u16(base_src + (y + 6) * src_w);
+            uint16x8_t r7 = vld1q_u16(base_src + (y + 7) * src_w);
 
-            // Extract to scalars
-            uint16_t p0 = vgetq_lane_u16(pixels, 0);
-            uint16_t p1 = vgetq_lane_u16(pixels, 1);
-            uint16_t p2 = vgetq_lane_u16(pixels, 2);
-            uint16_t p3 = vgetq_lane_u16(pixels, 3);
-            uint16_t p4 = vgetq_lane_u16(pixels, 4);
-            uint16_t p5 = vgetq_lane_u16(pixels, 5);
-            uint16_t p6 = vgetq_lane_u16(pixels, 6);
-            uint16_t p7 = vgetq_lane_u16(pixels, 7);
+            uint16x8_t out[8];
+            transpose8x8_u16(r0, r1, r2, r3, r4, r5, r6, r7, out);
 
-            int base_dy = src_w_idx - x;
-
-            // Scatter stores
-            dst_col[(base_dy - 0) * dst_w] = p0;
-            dst_col[(base_dy - 1) * dst_w] = p1;
-            dst_col[(base_dy - 2) * dst_w] = p2;
-            dst_col[(base_dy - 3) * dst_w] = p3;
-            dst_col[(base_dy - 4) * dst_w] = p4;
-            dst_col[(base_dy - 5) * dst_w] = p5;
-            dst_col[(base_dy - 6) * dst_w] = p6;
-            dst_col[(base_dy - 7) * dst_w] = p7;
+            int base_src_w_idx = src_w_idx - x;
+            // Store each column into rotated framebuffer
+            for (int j = 0; j < 8; j++)
+            {
+                vst1q_u16(base_dst + (base_src_w_idx - j) * dst_w, out[j]);
+            }
         }
     }
 
