@@ -33,29 +33,6 @@
 
 #include "SDL_syswm.h"
 
-#if SDL_VIDEO_OPENGL
-#include "SDL_opengl.h"
-#endif /* SDL_VIDEO_OPENGL */
-
-#if SDL_VIDEO_OPENGL_ES && !SDL_VIDEO_OPENGL
-#include "SDL_opengles.h"
-#endif /* SDL_VIDEO_OPENGL_ES && !SDL_VIDEO_OPENGL */
-
-/* GL and GLES2 headers conflict on Linux 32 bits */
-#if SDL_VIDEO_OPENGL_ES2 && !SDL_VIDEO_OPENGL
-#include "SDL_opengles2.h"
-#endif /* SDL_VIDEO_OPENGL_ES2 && !SDL_VIDEO_OPENGL */
-
-#if !SDL_VIDEO_OPENGL
-#ifndef GL_CONTEXT_RELEASE_BEHAVIOR_KHR
-#define GL_CONTEXT_RELEASE_BEHAVIOR_KHR 0x82FB
-#endif
-#endif
-
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
-
 #ifdef __LINUX__
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -65,89 +42,7 @@
 
 /* Available video drivers */
 static VideoBootStrap *bootstrap[] = {
-#if SDL_VIDEO_DRIVER_COCOA
-    &COCOA_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_X11
-    &X11_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_WAYLAND
-    &Wayland_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_VIVANTE
-    &VIVANTE_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_DIRECTFB
-    &DirectFB_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_FBCON
     &FBCon_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_WINDOWS
-    &WINDOWS_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_WINRT
-    &WINRT_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_HAIKU
-    &HAIKU_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_PANDORA
-    &PND_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_UIKIT
-    &UIKIT_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_ANDROID
-    &Android_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_PS2
-    &PS2_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_PSP
-    &PSP_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_VITA
-    &VITA_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_N3DS
-    &N3DS_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_KMSDRM
-    &KMSDRM_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_RISCOS
-    &RISCOS_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_RPI
-    &RPI_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_NACL
-    &NACL_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_EMSCRIPTEN
-    &Emscripten_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_QNX
-    &QNX_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_OFFSCREEN
-    &OFFSCREEN_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_NGAGE
-    &NGAGE_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_OS2
-    &OS2DIVE_bootstrap,
-    &OS2VMAN_bootstrap,
-#endif
-#if SDL_VIDEO_DRIVER_DUMMY
-    &DUMMY_bootstrap,
-#if SDL_INPUT_LINUXEV
-    &DUMMY_evdev_bootstrap,
-#endif
-#endif
-    NULL
 };
 
 #define CHECK_WINDOW_MAGIC(window, retval) \
@@ -172,12 +67,6 @@ static VideoBootStrap *bootstrap[] = {
     }
 
 #define FULLSCREEN_MASK (SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_FULLSCREEN)
-
-#if defined(__MACOSX__) && defined(SDL_VIDEO_DRIVER_COCOA)
-/* Support for Mac OS X fullscreen spaces */
-extern SDL_bool Cocoa_IsWindowInFullscreenSpace(SDL_Window * window);
-extern SDL_bool Cocoa_SetWindowFullscreenSpace(SDL_Window * window, SDL_bool state);
-#endif
 
 /* Convenience functions for reading driver flags */
 static SDL_bool
@@ -208,16 +97,6 @@ typedef struct {
 static Uint32
 SDL_DefaultGraphicsBackends(SDL_VideoDevice *_this)
 {
-#if (SDL_VIDEO_OPENGL && __MACOSX__) || (__IPHONEOS__ && !TARGET_OS_MACCATALYST) || __ANDROID__ || __NACL__
-    if (_this->GL_CreateContext != NULL) {
-        return SDL_WINDOW_OPENGL;
-    }
-#endif
-#if SDL_VIDEO_METAL && (TARGET_OS_MACCATALYST || __MACOSX__ || __IPHONEOS__)
-    if (_this->Metal_CreateView != NULL) {
-        return SDL_WINDOW_METAL;
-    }
-#endif
     return 0;
 }
 
@@ -440,8 +319,6 @@ SDL_VideoInit(const char *driver_name)
     SDL_VideoDevice *video;
     SDL_bool init_events = SDL_FALSE;
     SDL_bool init_keyboard = SDL_FALSE;
-    SDL_bool init_mouse = SDL_FALSE;
-    SDL_bool init_touch = SDL_FALSE;
     int i = 0;
 
     /* Check to make sure we don't overwrite '_this' */
@@ -462,14 +339,6 @@ SDL_VideoInit(const char *driver_name)
         goto pre_driver_error;
     }
     init_keyboard = SDL_TRUE;
-    if (SDL_MouseInit() < 0) {
-        goto pre_driver_error;
-    }
-    init_mouse = SDL_TRUE;
-    if (SDL_TouchInit() < 0) {
-        goto pre_driver_error;
-    }
-    init_touch = SDL_TRUE;
 
     /* Select the proper video driver */
     video = NULL;
@@ -517,15 +386,6 @@ SDL_VideoInit(const char *driver_name)
     _this->next_object_id = 1;
     _this->thread = SDL_ThreadID();
 
-
-    /* Set some very sane GL defaults */
-    _this->gl_config.driver_loaded = 0;
-    _this->gl_config.dll_handle = NULL;
-    SDL_GL_ResetAttributes();
-
-    _this->current_glwin_tls = SDL_TLSCreate();
-    _this->current_glctx_tls = SDL_TLSCreate();
-
     /* Initialize the video subsystem */
     if (_this->VideoInit(_this) < 0) {
         SDL_VideoQuit();
@@ -564,12 +424,6 @@ SDL_VideoInit(const char *driver_name)
 
 pre_driver_error:
     SDL_assert(_this == NULL);
-    if (init_touch) {
-        SDL_TouchQuit();
-    }
-    if (init_mouse) {
-        SDL_MouseQuit();
-    }
     if (init_keyboard) {
         SDL_KeyboardQuit();
     }
@@ -1349,17 +1203,6 @@ SDL_GetWindowPixelFormat(SDL_Window * window)
     return display->current_mode.format;
 }
 
-static void
-SDL_RestoreMousePosition(SDL_Window *window)
-{
-    int x, y;
-
-    if (window == SDL_GetMouseFocus()) {
-        SDL_GetMouseState(&x, &y);
-        SDL_WarpMouseInWindow(window, x, y);
-    }
-}
-
 #if __WINRT__
 extern Uint32 WINRT_DetectWindowFlags(SDL_Window * window);
 #endif
@@ -1508,7 +1351,6 @@ SDL_UpdateFullscreenMode(SDL_Window * window, SDL_bool fullscreen)
                     SDL_OnWindowResized(other);
                 }
 
-                SDL_RestoreMousePosition(other);
 
                 window->last_fullscreen_flags = window->flags;
                 return 0;
@@ -1527,15 +1369,12 @@ SDL_UpdateFullscreenMode(SDL_Window * window, SDL_bool fullscreen)
     /* Generate a mode change event here */
     SDL_OnWindowResized(window);
 
-    /* Restore the cursor position */
-    SDL_RestoreMousePosition(window);
-
     window->last_fullscreen_flags = window->flags;
     return 0;
 }
 
 #define CREATE_FLAGS \
-    (SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_SKIP_TASKBAR | SDL_WINDOW_POPUP_MENU | SDL_WINDOW_UTILITY | SDL_WINDOW_TOOLTIP | SDL_WINDOW_VULKAN | SDL_WINDOW_MINIMIZED | SDL_WINDOW_METAL)
+    (SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_SKIP_TASKBAR | SDL_WINDOW_POPUP_MENU | SDL_WINDOW_UTILITY | SDL_WINDOW_TOOLTIP  | SDL_WINDOW_MINIMIZED)
 
 static SDL_INLINE SDL_bool
 IsAcceptingDragAndDrop(void)
@@ -1583,34 +1422,12 @@ SDL_FinishWindowCreation(SDL_Window *window, Uint32 flags)
     if (flags & SDL_WINDOW_FULLSCREEN) {
         SDL_SetWindowFullscreen(window, flags);
     }
-    if (flags & SDL_WINDOW_MOUSE_GRABBED) {
-        /* We must specifically call SDL_SetWindowGrab() and not
-           SDL_SetWindowMouseGrab() here because older applications may use
-           this flag plus SDL_HINT_GRAB_KEYBOARD to indicate that they want
-           the keyboard grabbed too and SDL_SetWindowMouseGrab() won't do that.
-        */
-        SDL_SetWindowGrab(window, SDL_TRUE);
-    }
     if (flags & SDL_WINDOW_KEYBOARD_GRABBED) {
         SDL_SetWindowKeyboardGrab(window, SDL_TRUE);
     }
     if (!(flags & SDL_WINDOW_HIDDEN)) {
         SDL_ShowWindow(window);
     }
-}
-
-static int
-SDL_ContextNotSupported(const char *name)
-{
-    return SDL_SetError("%s support is either not configured in SDL "
-                 "or not available in current SDL video driver "
-                 "(%s) or platform", name, _this->name);
-}
-
-static int
-SDL_DllNotSupported(const char *name)
-{
-    return SDL_SetError("No dynamic %s support in current SDL video driver (%s)", name, _this->name);
 }
 
 SDL_Window *
@@ -1647,43 +1464,9 @@ SDL_CreateWindow(const char *title, int x, int y, int w, int h, Uint32 flags)
         return NULL;
     }
 
-    /* ensure no more than one of these flags is set */
-    graphics_flags = flags & (SDL_WINDOW_OPENGL | SDL_WINDOW_METAL | SDL_WINDOW_VULKAN);
-    if ((graphics_flags & (graphics_flags - 1)) != 0) {
-        SDL_SetError("Conflicting window flags specified");
-        return NULL;
-    }
-
     /* Some platforms have certain graphics backends enabled by default */
     if (!graphics_flags && !SDL_IsVideoContextExternal()) {
         flags |= SDL_DefaultGraphicsBackends(_this);
-    }
-
-    if (flags & SDL_WINDOW_OPENGL) {
-        if (!_this->GL_CreateContext) {
-            SDL_ContextNotSupported("OpenGL");
-            return NULL;
-        }
-        if (SDL_GL_LoadLibrary(NULL) < 0) {
-            return NULL;
-        }
-    }
-
-    if (flags & SDL_WINDOW_VULKAN) {
-        if (!_this->Vulkan_CreateSurface) {
-            SDL_ContextNotSupported("Vulkan");
-            return NULL;
-        }
-        if (SDL_Vulkan_LoadLibrary(NULL) < 0) {
-            return NULL;
-        }
-    }
-
-    if (flags & SDL_WINDOW_METAL) {
-        if (!_this->Metal_CreateView) {
-            SDL_ContextNotSupported("Metal");
-            return NULL;
-        }
     }
 
     /* Unless the user has specified the high-DPI disabling hint, respect the
@@ -1821,32 +1604,6 @@ SDL_CreateWindowFrom(const void *data)
         return NULL;
     }
 
-    if (SDL_GetHintBoolean(SDL_HINT_VIDEO_FOREIGN_WINDOW_OPENGL, SDL_FALSE)) {
-        if (!_this->GL_CreateContext) {
-            SDL_ContextNotSupported("OpenGL");
-            return NULL;
-        }
-        if (SDL_GL_LoadLibrary(NULL) < 0) {
-            return NULL;
-        }
-        flags |= SDL_WINDOW_OPENGL;
-    }
-
-    if (SDL_GetHintBoolean(SDL_HINT_VIDEO_FOREIGN_WINDOW_VULKAN, SDL_FALSE)) {
-        if (!_this->Vulkan_CreateSurface) {
-            SDL_ContextNotSupported("Vulkan");
-            return NULL;
-        }
-        if (flags & SDL_WINDOW_OPENGL) {
-            SDL_SetError("Vulkan and OpenGL not supported on same window");
-            return NULL;
-        }
-        if (SDL_Vulkan_LoadLibrary(NULL) < 0) {
-            return NULL;
-        }
-        flags |= SDL_WINDOW_VULKAN;
-    }
-
     window = (SDL_Window *)SDL_calloc(1, sizeof(*window));
     if (!window) {
         SDL_OutOfMemory();
@@ -1879,29 +1636,6 @@ SDL_CreateWindowFrom(const void *data)
 int
 SDL_RecreateWindow(SDL_Window * window, Uint32 flags)
 {
-    SDL_bool loaded_opengl = SDL_FALSE;
-    SDL_bool need_gl_unload = SDL_FALSE;
-    SDL_bool need_gl_load = SDL_FALSE;
-    SDL_bool loaded_vulkan = SDL_FALSE;
-    SDL_bool need_vulkan_unload = SDL_FALSE;
-    SDL_bool need_vulkan_load = SDL_FALSE;
-    Uint32 graphics_flags;
-
-    /* ensure no more than one of these flags is set */
-    graphics_flags = flags & (SDL_WINDOW_OPENGL | SDL_WINDOW_METAL | SDL_WINDOW_VULKAN);
-    if ((graphics_flags & (graphics_flags - 1)) != 0) {
-        return SDL_SetError("Conflicting window flags specified");
-    }
-
-    if ((flags & SDL_WINDOW_OPENGL) && !_this->GL_CreateContext) {
-        return SDL_ContextNotSupported("OpenGL");
-    }
-    if ((flags & SDL_WINDOW_VULKAN) && !_this->Vulkan_CreateSurface) {
-        return SDL_ContextNotSupported("Vulkan");
-    }
-    if ((flags & SDL_WINDOW_METAL) && !_this->Metal_CreateView) {
-        return SDL_ContextNotSupported("Metal");
-    }
 
     if (window->flags & SDL_WINDOW_FOREIGN) {
         /* Can't destroy and re-create foreign windows, hrm */
@@ -1933,64 +1667,12 @@ SDL_RecreateWindow(SDL_Window * window, Uint32 flags)
         _this->DestroyWindow(_this, window);
     }
 
-    if ((window->flags & SDL_WINDOW_OPENGL) != (flags & SDL_WINDOW_OPENGL)) {
-        if (flags & SDL_WINDOW_OPENGL) {
-            need_gl_load = SDL_TRUE;
-        } else {
-            need_gl_unload = SDL_TRUE;
-        }
-    } else if (window->flags & SDL_WINDOW_OPENGL) {
-        need_gl_unload = SDL_TRUE;
-        need_gl_load  = SDL_TRUE;
-    }
-
-    if ((window->flags & SDL_WINDOW_VULKAN) != (flags & SDL_WINDOW_VULKAN)) {
-        if (flags & SDL_WINDOW_VULKAN) {
-            need_vulkan_load = SDL_TRUE;
-        } else {
-            need_vulkan_unload = SDL_TRUE;
-        }
-    } else if (window->flags & SDL_WINDOW_VULKAN) {
-        need_vulkan_unload = SDL_TRUE;
-        need_vulkan_load  = SDL_TRUE;
-    }
-
-    if (need_gl_unload) {
-        SDL_GL_UnloadLibrary();
-    }
-
-    if (need_vulkan_unload) {
-        SDL_Vulkan_UnloadLibrary();
-    }
-
-    if (need_gl_load) {
-        if (SDL_GL_LoadLibrary(NULL) < 0) {
-            return -1;
-        }
-        loaded_opengl = SDL_TRUE;
-    }
-
-    if (need_vulkan_load) {
-        if (SDL_Vulkan_LoadLibrary(NULL) < 0) {
-            return -1;
-        }
-        loaded_vulkan = SDL_TRUE;
-    }
-
     window->flags = ((flags & CREATE_FLAGS) | SDL_WINDOW_HIDDEN);
     window->last_fullscreen_flags = window->flags;
     window->is_destroying = SDL_FALSE;
 
     if (_this->CreateSDLWindow && !(flags & SDL_WINDOW_FOREIGN)) {
         if (_this->CreateSDLWindow(_this, window) < 0) {
-            if (loaded_opengl) {
-                SDL_GL_UnloadLibrary();
-                window->flags &= ~SDL_WINDOW_OPENGL;
-            }
-            if (loaded_vulkan) {
-                SDL_Vulkan_UnloadLibrary();
-                window->flags &= ~SDL_WINDOW_VULKAN;
-            }
             return -1;
         }
     }
@@ -2663,26 +2345,6 @@ SDL_CreateWindowFramebuffer(SDL_Window * window)
             attempt_texture_framebuffer = SDL_FALSE;
         }
 
-#if defined(__LINUX__)
-        /* On WSL, direct X11 is faster than using OpenGL for window framebuffers, so try to detect WSL and avoid texture framebuffer. */
-        else if ((_this->CreateWindowFramebuffer != NULL) && (SDL_strcmp(_this->name, "x11") == 0)) {
-            struct stat sb;
-            if ((stat("/proc/sys/fs/binfmt_misc/WSLInterop", &sb) == 0) || (stat("/run/WSL", &sb) == 0)) { /* if either of these exist, we're on WSL. */
-                attempt_texture_framebuffer = SDL_FALSE;
-            }
-        }
-#endif
-#if defined(__WIN32__) || defined(__WINGDK__) /* GDI BitBlt() is way faster than Direct3D dynamic textures right now. (!!! FIXME: is this still true?) */
-        else if ((_this->CreateWindowFramebuffer != NULL) && (SDL_strcmp(_this->name, "windows") == 0)) {
-            attempt_texture_framebuffer = SDL_FALSE;
-        }
-#endif
-#if defined(__EMSCRIPTEN__)
-        else {
-            attempt_texture_framebuffer = SDL_FALSE;
-        }
-#endif
-
         if (attempt_texture_framebuffer) {
             if (SDL_CreateWindowTexture(_this, window, &format, &pixels, &pitch) == -1) {
                 /* !!! FIXME: if this failed halfway (made renderer, failed to make texture, etc),
@@ -2942,32 +2604,22 @@ SDL_GetWindowGammaRamp(SDL_Window * window, Uint16 * red,
 void
 SDL_UpdateWindowGrab(SDL_Window * window)
 {
-    SDL_bool keyboard_grabbed, mouse_grabbed;
+    SDL_bool keyboard_grabbed;
 
     if (window->flags & SDL_WINDOW_INPUT_FOCUS) {
-        if (SDL_GetMouse()->relative_mode || (window->flags & SDL_WINDOW_MOUSE_GRABBED)) {
-            mouse_grabbed = SDL_TRUE;
-        } else {
-            mouse_grabbed = SDL_FALSE;
-        }
-
         if (window->flags & SDL_WINDOW_KEYBOARD_GRABBED) {
             keyboard_grabbed = SDL_TRUE;
         } else {
             keyboard_grabbed = SDL_FALSE;
         }
     } else {
-        mouse_grabbed = SDL_FALSE;
         keyboard_grabbed = SDL_FALSE;
     }
 
-    if (mouse_grabbed || keyboard_grabbed) {
+    if (keyboard_grabbed) {
         if (_this->grabbed_window && (_this->grabbed_window != window)) {
             /* stealing a grab from another window! */
-            _this->grabbed_window->flags &= ~(SDL_WINDOW_MOUSE_GRABBED | SDL_WINDOW_KEYBOARD_GRABBED);
-            if (_this->SetWindowMouseGrab) {
-                _this->SetWindowMouseGrab(_this, _this->grabbed_window, SDL_FALSE);
-            }
+            _this->grabbed_window->flags &= ~(SDL_WINDOW_KEYBOARD_GRABBED);
             if (_this->SetWindowKeyboardGrab) {
                 _this->SetWindowKeyboardGrab(_this, _this->grabbed_window, SDL_FALSE);
             }
@@ -2977,9 +2629,6 @@ SDL_UpdateWindowGrab(SDL_Window * window)
         _this->grabbed_window = NULL;  /* ungrabbing input. */
     }
 
-    if (_this->SetWindowMouseGrab) {
-        _this->SetWindowMouseGrab(_this, window, mouse_grabbed);
-    }
     if (_this->SetWindowKeyboardGrab) {
         _this->SetWindowKeyboardGrab(_this, window, keyboard_grabbed);
     }
@@ -2989,8 +2638,6 @@ void
 SDL_SetWindowGrab(SDL_Window * window, SDL_bool grabbed)
 {
     CHECK_WINDOW_MAGIC(window,);
-
-    SDL_SetWindowMouseGrab(window, grabbed);
 
     if (SDL_GetHintBoolean(SDL_HINT_GRAB_KEYBOARD, SDL_FALSE)) {
         SDL_SetWindowKeyboardGrab(window, grabbed);
@@ -3013,26 +2660,10 @@ SDL_SetWindowKeyboardGrab(SDL_Window * window, SDL_bool grabbed)
     SDL_UpdateWindowGrab(window);
 }
 
-void
-SDL_SetWindowMouseGrab(SDL_Window * window, SDL_bool grabbed)
-{
-    CHECK_WINDOW_MAGIC(window,);
-
-    if (!!grabbed == !!(window->flags & SDL_WINDOW_MOUSE_GRABBED)) {
-        return;
-    }
-    if (grabbed) {
-        window->flags |= SDL_WINDOW_MOUSE_GRABBED;
-    } else {
-        window->flags &= ~SDL_WINDOW_MOUSE_GRABBED;
-    }
-    SDL_UpdateWindowGrab(window);
-}
-
 SDL_bool
 SDL_GetWindowGrab(SDL_Window * window)
 {
-    return (SDL_GetWindowKeyboardGrab(window) || SDL_GetWindowMouseGrab(window));
+    return SDL_GetWindowKeyboardGrab(window);
 }
 
 SDL_bool
@@ -3043,51 +2674,14 @@ SDL_GetWindowKeyboardGrab(SDL_Window * window)
            ((_this->grabbed_window->flags & SDL_WINDOW_KEYBOARD_GRABBED) != 0);
 }
 
-SDL_bool
-SDL_GetWindowMouseGrab(SDL_Window * window)
-{
-    CHECK_WINDOW_MAGIC(window, SDL_FALSE);
-    return window == _this->grabbed_window &&
-           ((_this->grabbed_window->flags & SDL_WINDOW_MOUSE_GRABBED) != 0);
-}
-
 SDL_Window *
 SDL_GetGrabbedWindow(void)
 {
     if (_this->grabbed_window &&
-        (_this->grabbed_window->flags & (SDL_WINDOW_MOUSE_GRABBED|SDL_WINDOW_KEYBOARD_GRABBED)) != 0) {
+        (_this->grabbed_window->flags & SDL_WINDOW_KEYBOARD_GRABBED) != 0) {
         return _this->grabbed_window;
     } else {
         return NULL;
-    }
-}
-
-int
-SDL_SetWindowMouseRect(SDL_Window * window, const SDL_Rect * rect)
-{
-    CHECK_WINDOW_MAGIC(window, -1);
-
-    if (rect) {
-        SDL_memcpy(&window->mouse_rect, rect, sizeof(*rect));
-    } else {
-        SDL_zero(window->mouse_rect);
-    }
-
-    if (_this->SetWindowMouseRect) {
-        _this->SetWindowMouseRect(_this, window);
-    }
-    return 0;
-}
-
-const SDL_Rect *
-SDL_GetWindowMouseRect(SDL_Window * window)
-{
-    CHECK_WINDOW_MAGIC(window, NULL);
-
-    if (SDL_RectEmpty(&window->mouse_rect)) {
-        return NULL;
-    } else {
-        return &window->mouse_rect;
     }
 }
 
@@ -3182,17 +2776,8 @@ SDL_OnWindowLeave(SDL_Window * window)
 void
 SDL_OnWindowFocusGained(SDL_Window * window)
 {
-    SDL_Mouse *mouse = SDL_GetMouse();
-
     if (window->gamma && _this->SetWindowGammaRamp) {
         _this->SetWindowGammaRamp(_this, window, window->gamma);
-    }
-
-    if (mouse && mouse->relative_mode) {
-        SDL_SetMouseFocus(window);
-        if (mouse->relative_mode_warp) {
-            SDL_PerformWarpMouseInWindow(window, window->w/2, window->h/2, SDL_TRUE);
-        }
     }
 
     SDL_UpdateWindowGrab(window);
@@ -3287,16 +2872,6 @@ SDL_DestroyWindow(SDL_Window * window)
     if (SDL_GetKeyboardFocus() == window) {
         SDL_SetKeyboardFocus(NULL);
     }
-    if (SDL_GetMouseFocus() == window) {
-        SDL_SetMouseFocus(NULL);
-    }
-
-    /* make no context current if this is the current context window. */
-    if (window->flags & SDL_WINDOW_OPENGL) {
-        if (_this->current_glwin == window) {
-            SDL_GL_MakeCurrent(window, NULL);
-        }
-    }
 
     if (window->surface) {
         window->surface->flags &= ~SDL_DONTFREE;
@@ -3311,12 +2886,6 @@ SDL_DestroyWindow(SDL_Window * window)
     }
     if (_this->DestroyWindow) {
         _this->DestroyWindow(_this, window);
-    }
-    if (window->flags & SDL_WINDOW_OPENGL) {
-        SDL_GL_UnloadLibrary();
-    }
-    if (window->flags & SDL_WINDOW_VULKAN) {
-        SDL_Vulkan_UnloadLibrary();
     }
 
     display = SDL_GetDisplayForWindow(window);
@@ -3401,8 +2970,6 @@ SDL_VideoQuit(void)
     }
 
     /* Halt event processing before doing anything else */
-    SDL_TouchQuit();
-    SDL_MouseQuit();
     SDL_KeyboardQuit();
     SDL_QuitSubSystem(SDL_INIT_EVENTS);
 
@@ -3434,795 +3001,6 @@ SDL_VideoQuit(void)
     _this->clipboard_text = NULL;
     _this->free(_this);
     _this = NULL;
-}
-
-int
-SDL_GL_LoadLibrary(const char *path)
-{
-    int retval;
-
-    if (!_this) {
-        return SDL_UninitializedVideo();
-    }
-    if (_this->gl_config.driver_loaded) {
-        if (path && SDL_strcmp(path, _this->gl_config.driver_path) != 0) {
-            return SDL_SetError("OpenGL library already loaded");
-        }
-        retval = 0;
-    } else {
-        if (!_this->GL_LoadLibrary) {
-            return SDL_DllNotSupported("OpenGL");
-        }
-        retval = _this->GL_LoadLibrary(_this, path);
-    }
-    if (retval == 0) {
-        ++_this->gl_config.driver_loaded;
-    } else {
-        if (_this->GL_UnloadLibrary) {
-            _this->GL_UnloadLibrary(_this);
-        }
-    }
-    return (retval);
-}
-
-void *
-SDL_GL_GetProcAddress(const char *proc)
-{
-    void *func;
-
-    if (!_this) {
-        SDL_UninitializedVideo();
-        return NULL;
-    }
-    func = NULL;
-    if (_this->GL_GetProcAddress) {
-        if (_this->gl_config.driver_loaded) {
-            func = _this->GL_GetProcAddress(_this, proc);
-        } else {
-            SDL_SetError("No GL driver has been loaded");
-        }
-    } else {
-        SDL_SetError("No dynamic GL support in current SDL video driver (%s)", _this->name);
-    }
-    return func;
-}
-
-void
-SDL_GL_UnloadLibrary(void)
-{
-    if (!_this) {
-        SDL_UninitializedVideo();
-        return;
-    }
-    if (_this->gl_config.driver_loaded > 0) {
-        if (--_this->gl_config.driver_loaded > 0) {
-            return;
-        }
-        if (_this->GL_UnloadLibrary) {
-            _this->GL_UnloadLibrary(_this);
-        }
-    }
-}
-
-#if SDL_VIDEO_OPENGL || SDL_VIDEO_OPENGL_ES || SDL_VIDEO_OPENGL_ES2
-static SDL_INLINE SDL_bool
-isAtLeastGL3(const char *verstr)
-{
-    return (verstr && (SDL_atoi(verstr) >= 3));
-}
-#endif
-
-SDL_bool
-SDL_GL_ExtensionSupported(const char *extension)
-{
-#if SDL_VIDEO_OPENGL || SDL_VIDEO_OPENGL_ES || SDL_VIDEO_OPENGL_ES2
-    const GLubyte *(APIENTRY * glGetStringFunc) (GLenum);
-    const char *extensions;
-    const char *start;
-    const char *where, *terminator;
-
-    /* Extension names should not have spaces. */
-    where = SDL_strchr(extension, ' ');
-    if (where || *extension == '\0') {
-        return SDL_FALSE;
-    }
-    /* See if there's an environment variable override */
-    start = SDL_getenv(extension);
-    if (start && *start == '0') {
-        return SDL_FALSE;
-    }
-
-    /* Lookup the available extensions */
-
-    glGetStringFunc = SDL_GL_GetProcAddress("glGetString");
-    if (!glGetStringFunc) {
-        return SDL_FALSE;
-    }
-
-    if (isAtLeastGL3((const char *) glGetStringFunc(GL_VERSION))) {
-        const GLubyte *(APIENTRY * glGetStringiFunc) (GLenum, GLuint);
-        void (APIENTRY * glGetIntegervFunc) (GLenum pname, GLint * params);
-        GLint num_exts = 0;
-        GLint i;
-
-        glGetStringiFunc = SDL_GL_GetProcAddress("glGetStringi");
-        glGetIntegervFunc = SDL_GL_GetProcAddress("glGetIntegerv");
-        if ((!glGetStringiFunc) || (!glGetIntegervFunc)) {
-            return SDL_FALSE;
-        }
-
-        #ifndef GL_NUM_EXTENSIONS
-        #define GL_NUM_EXTENSIONS 0x821D
-        #endif
-        glGetIntegervFunc(GL_NUM_EXTENSIONS, &num_exts);
-        for (i = 0; i < num_exts; i++) {
-            const char *thisext = (const char *) glGetStringiFunc(GL_EXTENSIONS, i);
-            if (SDL_strcmp(thisext, extension) == 0) {
-                return SDL_TRUE;
-            }
-        }
-
-        return SDL_FALSE;
-    }
-
-    /* Try the old way with glGetString(GL_EXTENSIONS) ... */
-
-    extensions = (const char *) glGetStringFunc(GL_EXTENSIONS);
-    if (!extensions) {
-        return SDL_FALSE;
-    }
-    /*
-     * It takes a bit of care to be fool-proof about parsing the OpenGL
-     * extensions string. Don't be fooled by sub-strings, etc.
-     */
-
-    start = extensions;
-
-    for (;;) {
-        where = SDL_strstr(start, extension);
-        if (!where)
-            break;
-
-        terminator = where + SDL_strlen(extension);
-        if (where == extensions || *(where - 1) == ' ')
-            if (*terminator == ' ' || *terminator == '\0')
-                return SDL_TRUE;
-
-        start = terminator;
-    }
-    return SDL_FALSE;
-#else
-    return SDL_FALSE;
-#endif
-}
-
-/* Deduce supported ES profile versions from the supported
-   ARB_ES*_compatibility extensions. There is no direct query.
-   
-   This is normally only called when the OpenGL driver supports
-   {GLX,WGL}_EXT_create_context_es2_profile.
- */
-void
-SDL_GL_DeduceMaxSupportedESProfile(int* major, int* minor)
-{
-/* THIS REQUIRES AN EXISTING GL CONTEXT THAT HAS BEEN MADE CURRENT. */
-/*  Please refer to https://bugzilla.libsdl.org/show_bug.cgi?id=3725 for discussion. */
-#if SDL_VIDEO_OPENGL || SDL_VIDEO_OPENGL_ES || SDL_VIDEO_OPENGL_ES2
-    /* XXX This is fragile; it will break in the event of release of
-     * new versions of OpenGL ES.
-     */
-    if (SDL_GL_ExtensionSupported("GL_ARB_ES3_2_compatibility")) {
-        *major = 3;
-        *minor = 2;
-    } else if (SDL_GL_ExtensionSupported("GL_ARB_ES3_1_compatibility")) {
-        *major = 3;
-        *minor = 1;
-    } else if (SDL_GL_ExtensionSupported("GL_ARB_ES3_compatibility")) {
-        *major = 3;
-        *minor = 0;
-    } else {
-        *major = 2;
-        *minor = 0;
-    }
-#endif
-}
-
-void
-SDL_GL_ResetAttributes()
-{
-    if (!_this) {
-        return;
-    }
-
-    _this->gl_config.red_size = 3;
-    _this->gl_config.green_size = 3;
-    _this->gl_config.blue_size = 2;
-    _this->gl_config.alpha_size = 0;
-    _this->gl_config.buffer_size = 0;
-    _this->gl_config.depth_size = 16;
-    _this->gl_config.stencil_size = 0;
-    _this->gl_config.double_buffer = 1;
-    _this->gl_config.accum_red_size = 0;
-    _this->gl_config.accum_green_size = 0;
-    _this->gl_config.accum_blue_size = 0;
-    _this->gl_config.accum_alpha_size = 0;
-    _this->gl_config.stereo = 0;
-    _this->gl_config.multisamplebuffers = 0;
-    _this->gl_config.multisamplesamples = 0;
-    _this->gl_config.floatbuffers = 0;
-    _this->gl_config.retained_backing = 1;
-    _this->gl_config.accelerated = -1;  /* accelerated or not, both are fine */
-
-#if SDL_VIDEO_OPENGL
-    _this->gl_config.major_version = 2;
-    _this->gl_config.minor_version = 1;
-    _this->gl_config.profile_mask = 0;
-#elif SDL_VIDEO_OPENGL_ES2
-    _this->gl_config.major_version = 2;
-    _this->gl_config.minor_version = 0;
-    _this->gl_config.profile_mask = SDL_GL_CONTEXT_PROFILE_ES;
-#elif SDL_VIDEO_OPENGL_ES
-    _this->gl_config.major_version = 1;
-    _this->gl_config.minor_version = 1;
-    _this->gl_config.profile_mask = SDL_GL_CONTEXT_PROFILE_ES;
-#endif
-
-    if (_this->GL_DefaultProfileConfig) {
-        _this->GL_DefaultProfileConfig(_this, &_this->gl_config.profile_mask,
-                                       &_this->gl_config.major_version,
-                                       &_this->gl_config.minor_version);
-    }
-
-    _this->gl_config.flags = 0;
-    _this->gl_config.framebuffer_srgb_capable = 0;
-    _this->gl_config.no_error = 0;
-    _this->gl_config.release_behavior = SDL_GL_CONTEXT_RELEASE_BEHAVIOR_FLUSH;
-    _this->gl_config.reset_notification = SDL_GL_CONTEXT_RESET_NO_NOTIFICATION;
-
-    _this->gl_config.share_with_current_context = 0;
-}
-
-int
-SDL_GL_SetAttribute(SDL_GLattr attr, int value)
-{
-#if SDL_VIDEO_OPENGL || SDL_VIDEO_OPENGL_ES || SDL_VIDEO_OPENGL_ES2
-    int retval;
-
-    if (!_this) {
-        return SDL_UninitializedVideo();
-    }
-    retval = 0;
-    switch (attr) {
-    case SDL_GL_RED_SIZE:
-        _this->gl_config.red_size = value;
-        break;
-    case SDL_GL_GREEN_SIZE:
-        _this->gl_config.green_size = value;
-        break;
-    case SDL_GL_BLUE_SIZE:
-        _this->gl_config.blue_size = value;
-        break;
-    case SDL_GL_ALPHA_SIZE:
-        _this->gl_config.alpha_size = value;
-        break;
-    case SDL_GL_DOUBLEBUFFER:
-        _this->gl_config.double_buffer = value;
-        break;
-    case SDL_GL_BUFFER_SIZE:
-        _this->gl_config.buffer_size = value;
-        break;
-    case SDL_GL_DEPTH_SIZE:
-        _this->gl_config.depth_size = value;
-        break;
-    case SDL_GL_STENCIL_SIZE:
-        _this->gl_config.stencil_size = value;
-        break;
-    case SDL_GL_ACCUM_RED_SIZE:
-        _this->gl_config.accum_red_size = value;
-        break;
-    case SDL_GL_ACCUM_GREEN_SIZE:
-        _this->gl_config.accum_green_size = value;
-        break;
-    case SDL_GL_ACCUM_BLUE_SIZE:
-        _this->gl_config.accum_blue_size = value;
-        break;
-    case SDL_GL_ACCUM_ALPHA_SIZE:
-        _this->gl_config.accum_alpha_size = value;
-        break;
-    case SDL_GL_STEREO:
-        _this->gl_config.stereo = value;
-        break;
-    case SDL_GL_MULTISAMPLEBUFFERS:
-        _this->gl_config.multisamplebuffers = value;
-        break;
-    case SDL_GL_MULTISAMPLESAMPLES:
-        _this->gl_config.multisamplesamples = value;
-        break;
-    case SDL_GL_FLOATBUFFERS:
-        _this->gl_config.floatbuffers = value;
-        break;
-    case SDL_GL_ACCELERATED_VISUAL:
-        _this->gl_config.accelerated = value;
-        break;
-    case SDL_GL_RETAINED_BACKING:
-        _this->gl_config.retained_backing = value;
-        break;
-    case SDL_GL_CONTEXT_MAJOR_VERSION:
-        _this->gl_config.major_version = value;
-        break;
-    case SDL_GL_CONTEXT_MINOR_VERSION:
-        _this->gl_config.minor_version = value;
-        break;
-    case SDL_GL_CONTEXT_EGL:
-        /* FIXME: SDL_GL_CONTEXT_EGL to be deprecated in SDL 2.1 */
-        if (value != 0) {
-            SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-        } else {
-            SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, 0);
-        }
-        break;
-    case SDL_GL_CONTEXT_FLAGS:
-        if (value & ~(SDL_GL_CONTEXT_DEBUG_FLAG |
-                      SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG |
-                      SDL_GL_CONTEXT_ROBUST_ACCESS_FLAG |
-                      SDL_GL_CONTEXT_RESET_ISOLATION_FLAG)) {
-            retval = SDL_SetError("Unknown OpenGL context flag %d", value);
-            break;
-        }
-        _this->gl_config.flags = value;
-        break;
-    case SDL_GL_CONTEXT_PROFILE_MASK:
-        if (value != 0 &&
-            value != SDL_GL_CONTEXT_PROFILE_CORE &&
-            value != SDL_GL_CONTEXT_PROFILE_COMPATIBILITY &&
-            value != SDL_GL_CONTEXT_PROFILE_ES) {
-            retval = SDL_SetError("Unknown OpenGL context profile %d", value);
-            break;
-        }
-        _this->gl_config.profile_mask = value;
-        break;
-    case SDL_GL_SHARE_WITH_CURRENT_CONTEXT:
-        _this->gl_config.share_with_current_context = value;
-        break;
-    case SDL_GL_FRAMEBUFFER_SRGB_CAPABLE:
-        _this->gl_config.framebuffer_srgb_capable = value;
-        break;
-    case SDL_GL_CONTEXT_RELEASE_BEHAVIOR:
-        _this->gl_config.release_behavior = value;
-        break;
-    case SDL_GL_CONTEXT_RESET_NOTIFICATION:
-        _this->gl_config.reset_notification = value;
-        break;
-    case SDL_GL_CONTEXT_NO_ERROR:
-        _this->gl_config.no_error = value;
-        break;
-    default:
-        retval = SDL_SetError("Unknown OpenGL attribute");
-        break;
-    }
-    return retval;
-#else
-    return SDL_Unsupported();
-#endif /* SDL_VIDEO_OPENGL */
-}
-
-int
-SDL_GL_GetAttribute(SDL_GLattr attr, int *value)
-{
-#if SDL_VIDEO_OPENGL || SDL_VIDEO_OPENGL_ES || SDL_VIDEO_OPENGL_ES2
-    GLenum (APIENTRY *glGetErrorFunc) (void);
-    GLenum attrib = 0;
-    GLenum error = 0;
-
-    /*
-     * Some queries in Core Profile desktop OpenGL 3+ contexts require
-     * glGetFramebufferAttachmentParameteriv instead of glGetIntegerv. Note that
-     * the enums we use for the former function don't exist in OpenGL ES 2, and
-     * the function itself doesn't exist prior to OpenGL 3 and OpenGL ES 2.
-     */
-#if SDL_VIDEO_OPENGL
-    const GLubyte *(APIENTRY *glGetStringFunc) (GLenum name);
-    void (APIENTRY *glGetFramebufferAttachmentParameterivFunc) (GLenum target, GLenum attachment, GLenum pname, GLint* params);
-    GLenum attachment = GL_BACK_LEFT;
-    GLenum attachmentattrib = 0;
-#endif
-
-    if (!value) {
-        return SDL_InvalidParamError("value");
-    }
-
-    /* Clear value in any case */
-    *value = 0;
-
-    if (!_this) {
-        return SDL_UninitializedVideo();
-    }
-
-    switch (attr) {
-    case SDL_GL_RED_SIZE:
-#if SDL_VIDEO_OPENGL
-        attachmentattrib = GL_FRAMEBUFFER_ATTACHMENT_RED_SIZE;
-#endif
-        attrib = GL_RED_BITS;
-        break;
-    case SDL_GL_BLUE_SIZE:
-#if SDL_VIDEO_OPENGL
-        attachmentattrib = GL_FRAMEBUFFER_ATTACHMENT_BLUE_SIZE;
-#endif
-        attrib = GL_BLUE_BITS;
-        break;
-    case SDL_GL_GREEN_SIZE:
-#if SDL_VIDEO_OPENGL
-        attachmentattrib = GL_FRAMEBUFFER_ATTACHMENT_GREEN_SIZE;
-#endif
-        attrib = GL_GREEN_BITS;
-        break;
-    case SDL_GL_ALPHA_SIZE:
-#if SDL_VIDEO_OPENGL
-        attachmentattrib = GL_FRAMEBUFFER_ATTACHMENT_ALPHA_SIZE;
-#endif
-        attrib = GL_ALPHA_BITS;
-        break;
-    case SDL_GL_DOUBLEBUFFER:
-#if SDL_VIDEO_OPENGL
-        attrib = GL_DOUBLEBUFFER;
-        break;
-#else
-        /* OpenGL ES 1.0 and above specifications have EGL_SINGLE_BUFFER      */
-        /* parameter which switches double buffer to single buffer. OpenGL ES */
-        /* SDL driver must set proper value after initialization              */
-        *value = _this->gl_config.double_buffer;
-        return 0;
-#endif
-    case SDL_GL_DEPTH_SIZE:
-#if SDL_VIDEO_OPENGL
-        attachment = GL_DEPTH;
-        attachmentattrib = GL_FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE;
-#endif
-        attrib = GL_DEPTH_BITS;
-        break;
-    case SDL_GL_STENCIL_SIZE:
-#if SDL_VIDEO_OPENGL
-        attachment = GL_STENCIL;
-        attachmentattrib = GL_FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE;
-#endif
-        attrib = GL_STENCIL_BITS;
-        break;
-#if SDL_VIDEO_OPENGL
-    case SDL_GL_ACCUM_RED_SIZE:
-        attrib = GL_ACCUM_RED_BITS;
-        break;
-    case SDL_GL_ACCUM_GREEN_SIZE:
-        attrib = GL_ACCUM_GREEN_BITS;
-        break;
-    case SDL_GL_ACCUM_BLUE_SIZE:
-        attrib = GL_ACCUM_BLUE_BITS;
-        break;
-    case SDL_GL_ACCUM_ALPHA_SIZE:
-        attrib = GL_ACCUM_ALPHA_BITS;
-        break;
-    case SDL_GL_STEREO:
-        attrib = GL_STEREO;
-        break;
-#else
-    case SDL_GL_ACCUM_RED_SIZE:
-    case SDL_GL_ACCUM_GREEN_SIZE:
-    case SDL_GL_ACCUM_BLUE_SIZE:
-    case SDL_GL_ACCUM_ALPHA_SIZE:
-    case SDL_GL_STEREO:
-        /* none of these are supported in OpenGL ES */
-        *value = 0;
-        return 0;
-#endif
-    case SDL_GL_MULTISAMPLEBUFFERS:
-        attrib = GL_SAMPLE_BUFFERS;
-        break;
-    case SDL_GL_MULTISAMPLESAMPLES:
-        attrib = GL_SAMPLES;
-        break;
-    case SDL_GL_CONTEXT_RELEASE_BEHAVIOR:
-#if SDL_VIDEO_OPENGL
-        attrib = GL_CONTEXT_RELEASE_BEHAVIOR;
-#else
-        attrib = GL_CONTEXT_RELEASE_BEHAVIOR_KHR;
-#endif
-        break;
-    case SDL_GL_BUFFER_SIZE:
-        {
-            int rsize = 0, gsize = 0, bsize = 0, asize = 0;
-
-            /* There doesn't seem to be a single flag in OpenGL for this! */
-            if (SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &rsize) < 0) {
-                return -1;
-            }
-            if (SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &gsize) < 0) {
-                return -1;
-            }
-            if (SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &bsize) < 0) {
-                return -1;
-            }
-            if (SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &asize) < 0) {
-                return -1;
-            }
-
-            *value = rsize + gsize + bsize + asize;
-            return 0;
-        }
-    case SDL_GL_ACCELERATED_VISUAL:
-        {
-            /* FIXME: How do we get this information? */
-            *value = (_this->gl_config.accelerated != 0);
-            return 0;
-        }
-    case SDL_GL_RETAINED_BACKING:
-        {
-            *value = _this->gl_config.retained_backing;
-            return 0;
-        }
-    case SDL_GL_CONTEXT_MAJOR_VERSION:
-        {
-            *value = _this->gl_config.major_version;
-            return 0;
-        }
-    case SDL_GL_CONTEXT_MINOR_VERSION:
-        {
-            *value = _this->gl_config.minor_version;
-            return 0;
-        }
-    case SDL_GL_CONTEXT_EGL:
-        /* FIXME: SDL_GL_CONTEXT_EGL to be deprecated in SDL 2.1 */
-        {
-            if (_this->gl_config.profile_mask == SDL_GL_CONTEXT_PROFILE_ES) {
-                *value = 1;
-            }
-            else {
-                *value = 0;
-            }
-            return 0;
-        }
-    case SDL_GL_CONTEXT_FLAGS:
-        {
-            *value = _this->gl_config.flags;
-            return 0;
-        }
-    case SDL_GL_CONTEXT_PROFILE_MASK:
-        {
-            *value = _this->gl_config.profile_mask;
-            return 0;
-        }
-    case SDL_GL_SHARE_WITH_CURRENT_CONTEXT:
-        {
-            *value = _this->gl_config.share_with_current_context;
-            return 0;
-        }
-    case SDL_GL_FRAMEBUFFER_SRGB_CAPABLE:
-        {
-            *value = _this->gl_config.framebuffer_srgb_capable;
-            return 0;
-        }
-    case SDL_GL_CONTEXT_NO_ERROR:
-        {
-            *value = _this->gl_config.no_error;
-            return 0;
-        }
-    default:
-        return SDL_SetError("Unknown OpenGL attribute");
-    }
-
-#if SDL_VIDEO_OPENGL
-    glGetStringFunc = SDL_GL_GetProcAddress("glGetString");
-    if (!glGetStringFunc) {
-        return -1;
-    }
-
-    if (attachmentattrib && isAtLeastGL3((const char *) glGetStringFunc(GL_VERSION))) {
-        /* glGetFramebufferAttachmentParameteriv needs to operate on the window framebuffer for this, so bind FBO 0 if necessary. */
-        GLint current_fbo = 0;
-        void (APIENTRY *glGetIntegervFunc) (GLenum pname, GLint * params) = SDL_GL_GetProcAddress("glGetIntegerv");
-        void (APIENTRY *glBindFramebufferFunc) (GLenum target, GLuint fbo) = SDL_GL_GetProcAddress("glBindFramebuffer");
-        if (glGetIntegervFunc && glBindFramebufferFunc) {
-            glGetIntegervFunc(GL_DRAW_FRAMEBUFFER_BINDING, &current_fbo);
-        }
-
-        glGetFramebufferAttachmentParameterivFunc = SDL_GL_GetProcAddress("glGetFramebufferAttachmentParameteriv");
-        if (glGetFramebufferAttachmentParameterivFunc) {
-            if (glBindFramebufferFunc && (current_fbo != 0)) {
-                glBindFramebufferFunc(GL_DRAW_FRAMEBUFFER, 0);
-            }
-            glGetFramebufferAttachmentParameterivFunc(GL_FRAMEBUFFER, attachment, attachmentattrib, (GLint *) value);
-            if (glBindFramebufferFunc && (current_fbo != 0)) {
-                glBindFramebufferFunc(GL_DRAW_FRAMEBUFFER, current_fbo);
-            }
-        } else {
-            return -1;
-        }
-    } else
-#endif
-    {
-        void (APIENTRY *glGetIntegervFunc) (GLenum pname, GLint * params);
-        glGetIntegervFunc = SDL_GL_GetProcAddress("glGetIntegerv");
-        if (glGetIntegervFunc) {
-            glGetIntegervFunc(attrib, (GLint *) value);
-        } else {
-            return -1;
-        }
-    }
-
-    glGetErrorFunc = SDL_GL_GetProcAddress("glGetError");
-    if (!glGetErrorFunc) {
-        return -1;
-    }
-
-    error = glGetErrorFunc();
-    if (error != GL_NO_ERROR) {
-        if (error == GL_INVALID_ENUM) {
-            return SDL_SetError("OpenGL error: GL_INVALID_ENUM");
-        } else if (error == GL_INVALID_VALUE) {
-            return SDL_SetError("OpenGL error: GL_INVALID_VALUE");
-        }
-        return SDL_SetError("OpenGL error: %08X", error);
-    }
-    return 0;
-#else
-    return SDL_Unsupported();
-#endif /* SDL_VIDEO_OPENGL */
-}
-
-#define NOT_AN_OPENGL_WINDOW "The specified window isn't an OpenGL window"
-
-SDL_GLContext
-SDL_GL_CreateContext(SDL_Window * window)
-{
-    SDL_GLContext ctx = NULL;
-    CHECK_WINDOW_MAGIC(window, NULL);
-
-    if (!(window->flags & SDL_WINDOW_OPENGL)) {
-        SDL_SetError(NOT_AN_OPENGL_WINDOW);
-        return NULL;
-    }
-
-    ctx = _this->GL_CreateContext(_this, window);
-
-    /* Creating a context is assumed to make it current in the SDL driver. */
-    if (ctx) {
-        _this->current_glwin = window;
-        _this->current_glctx = ctx;
-        SDL_TLSSet(_this->current_glwin_tls, window, NULL);
-        SDL_TLSSet(_this->current_glctx_tls, ctx, NULL);
-    }
-    return ctx;
-}
-
-int
-SDL_GL_MakeCurrent(SDL_Window * window, SDL_GLContext ctx)
-{
-    int retval;
-
-    if (!_this) {
-        return SDL_UninitializedVideo();
-    }
-
-    if (window == SDL_GL_GetCurrentWindow() &&
-        ctx == SDL_GL_GetCurrentContext()) {
-        /* We're already current. */
-        return 0;
-    }
-
-    if (!ctx) {
-        window = NULL;
-    } else if (window) {
-        CHECK_WINDOW_MAGIC(window, -1);
-
-        if (!(window->flags & SDL_WINDOW_OPENGL)) {
-            return SDL_SetError(NOT_AN_OPENGL_WINDOW);
-        }
-    } else if (!_this->gl_allow_no_surface) {
-        return SDL_SetError("Use of OpenGL without a window is not supported on this platform");
-    }
-
-    retval = _this->GL_MakeCurrent(_this, window, ctx);
-    if (retval == 0) {
-        _this->current_glwin = window;
-        _this->current_glctx = ctx;
-        SDL_TLSSet(_this->current_glwin_tls, window, NULL);
-        SDL_TLSSet(_this->current_glctx_tls, ctx, NULL);
-    }
-    return retval;
-}
-
-SDL_Window *
-SDL_GL_GetCurrentWindow(void)
-{
-    if (!_this) {
-        SDL_UninitializedVideo();
-        return NULL;
-    }
-    return (SDL_Window *)SDL_TLSGet(_this->current_glwin_tls);
-}
-
-SDL_GLContext
-SDL_GL_GetCurrentContext(void)
-{
-    if (!_this) {
-        SDL_UninitializedVideo();
-        return NULL;
-    }
-    return (SDL_GLContext)SDL_TLSGet(_this->current_glctx_tls);
-}
-
-void SDL_GL_GetDrawableSize(SDL_Window * window, int *w, int *h)
-{
-    CHECK_WINDOW_MAGIC(window,);
-
-    if (_this->GL_GetDrawableSize) {
-        _this->GL_GetDrawableSize(_this, window, w, h);
-    } else {
-        SDL_GetWindowSizeInPixels(window, w, h);
-    }
-}
-
-int
-SDL_GL_SetSwapInterval(int interval)
-{
-    if (!_this) {
-        return SDL_UninitializedVideo();
-    } else if (SDL_GL_GetCurrentContext() == NULL) {
-        return SDL_SetError("No OpenGL context has been made current");
-    } else if (_this->GL_SetSwapInterval) {
-        return _this->GL_SetSwapInterval(_this, interval);
-    } else {
-        return SDL_SetError("Setting the swap interval is not supported");
-    }
-}
-
-int
-SDL_GL_GetSwapInterval(void)
-{
-    if (!_this) {
-        return 0;
-    } else if (SDL_GL_GetCurrentContext() == NULL) {
-        return 0;
-    } else if (_this->GL_GetSwapInterval) {
-        return _this->GL_GetSwapInterval(_this);
-    } else {
-        return 0;
-    }
-}
-
-int
-SDL_GL_SwapWindowWithResult(SDL_Window * window)
-{
-    CHECK_WINDOW_MAGIC(window, -1);
-
-    if (!(window->flags & SDL_WINDOW_OPENGL)) {
-        return SDL_SetError(NOT_AN_OPENGL_WINDOW);
-    }
-
-    if (SDL_GL_GetCurrentWindow() != window) {
-        return SDL_SetError("The specified window has not been made current");
-    }
-
-    return _this->GL_SwapWindow(_this, window);
-}
-
-void
-SDL_GL_SwapWindow(SDL_Window * window)
-{
-    SDL_GL_SwapWindowWithResult(window);
-}
-
-void
-SDL_GL_DeleteContext(SDL_GLContext context)
-{
-    if (!_this || !context) {
-        return;
-    }
-
-    if (SDL_GL_GetCurrentContext() == context) {
-        SDL_GL_MakeCurrent(NULL, NULL);
-    }
-
-    _this->GL_DeleteContext(_this, context);
 }
 
 #if 0                           /* FIXME */
@@ -4440,66 +3218,11 @@ SDL_GetMessageBoxCount(void)
     return SDL_AtomicGet(&SDL_messagebox_count);
 }
 
-#if SDL_VIDEO_DRIVER_ANDROID
-#include "android/SDL_androidmessagebox.h"
-#endif
-#if SDL_VIDEO_DRIVER_WINDOWS
-#include "windows/SDL_windowsmessagebox.h"
-#endif
-#if SDL_VIDEO_DRIVER_WINRT
-#include "winrt/SDL_winrtmessagebox.h"
-#endif
-#if SDL_VIDEO_DRIVER_COCOA
-#include "cocoa/SDL_cocoamessagebox.h"
-#endif
-#if SDL_VIDEO_DRIVER_UIKIT
-#include "uikit/SDL_uikitmessagebox.h"
-#endif
-#if SDL_VIDEO_DRIVER_X11
-#include "x11/SDL_x11messagebox.h"
-#endif
-#if SDL_VIDEO_DRIVER_WAYLAND
-#include "wayland/SDL_waylandmessagebox.h"
-#endif
-#if SDL_VIDEO_DRIVER_HAIKU
-#include "haiku/SDL_bmessagebox.h"
-#endif
-#if SDL_VIDEO_DRIVER_OS2
-#include "os2/SDL_os2messagebox.h"
-#endif
-#if SDL_VIDEO_DRIVER_RISCOS
-#include "riscos/SDL_riscosmessagebox.h"
-#endif
-#if SDL_VIDEO_DRIVER_VITA
-#include "vita/SDL_vitamessagebox.h"
-#endif
-
-#if SDL_VIDEO_DRIVER_WINDOWS || SDL_VIDEO_DRIVER_WINRT || SDL_VIDEO_DRIVER_COCOA || SDL_VIDEO_DRIVER_UIKIT || SDL_VIDEO_DRIVER_X11 || SDL_VIDEO_DRIVER_WAYLAND || SDL_VIDEO_DRIVER_HAIKU || SDL_VIDEO_DRIVER_OS2 || SDL_VIDEO_DRIVER_RISCOS
-static SDL_bool SDL_MessageboxValidForDriver(const SDL_MessageBoxData *messageboxdata, SDL_SYSWM_TYPE drivertype)
-{
-    SDL_SysWMinfo info;
-    SDL_Window *window = messageboxdata->window;
-
-    if (!window) {
-        return SDL_TRUE;
-    }
-
-    SDL_VERSION(&info.version);
-    if (!SDL_GetWindowWMInfo(window, &info)) {
-        return SDL_TRUE;
-    } else {
-        return (info.subsystem == drivertype);
-    }
-}
-#endif
-
 int
 SDL_ShowMessageBox(const SDL_MessageBoxData *messageboxdata, int *buttonid)
 {
     int dummybutton;
     int retval = -1;
-    SDL_bool relative_mode;
-    int show_cursor_prev;
     SDL_Window *current_window;
     SDL_MessageBoxData mbdata;
 
@@ -4512,10 +3235,6 @@ SDL_ShowMessageBox(const SDL_MessageBoxData *messageboxdata, int *buttonid)
     (void)SDL_AtomicIncRef(&SDL_messagebox_count);
 
     current_window = SDL_GetKeyboardFocus();
-    relative_mode = SDL_GetRelativeMouseMode();
-    SDL_UpdateMouseCapture(SDL_FALSE);
-    SDL_SetRelativeMouseMode(SDL_FALSE);
-    show_cursor_prev = SDL_ShowCursor(1);
     SDL_ResetKeyboard();
 
     if (!buttonid) {
@@ -4533,82 +3252,6 @@ SDL_ShowMessageBox(const SDL_MessageBoxData *messageboxdata, int *buttonid)
         retval = _this->ShowMessageBox(_this, messageboxdata, buttonid);
     }
 
-    /* It's completely fine to call this function before video is initialized */
-#if SDL_VIDEO_DRIVER_ANDROID
-    if (retval == -1 &&
-        Android_ShowMessageBox(messageboxdata, buttonid) == 0) {
-        retval = 0;
-    }
-#endif
-#if SDL_VIDEO_DRIVER_WINDOWS && !defined(__XBOXONE__) && !defined(__XBOXSERIES__)
-    if (retval == -1 &&
-        SDL_MessageboxValidForDriver(messageboxdata, SDL_SYSWM_WINDOWS) &&
-        WIN_ShowMessageBox(messageboxdata, buttonid) == 0) {
-        retval = 0;
-    }
-#endif
-#if SDL_VIDEO_DRIVER_WINRT
-    if (retval == -1 &&
-        SDL_MessageboxValidForDriver(messageboxdata, SDL_SYSWM_WINRT) &&
-        WINRT_ShowMessageBox(messageboxdata, buttonid) == 0) {
-        retval = 0;
-    }
-#endif
-#if SDL_VIDEO_DRIVER_COCOA
-    if (retval == -1 &&
-        SDL_MessageboxValidForDriver(messageboxdata, SDL_SYSWM_COCOA) &&
-        Cocoa_ShowMessageBox(messageboxdata, buttonid) == 0) {
-        retval = 0;
-    }
-#endif
-#if SDL_VIDEO_DRIVER_UIKIT
-    if (retval == -1 &&
-        SDL_MessageboxValidForDriver(messageboxdata, SDL_SYSWM_UIKIT) &&
-        UIKit_ShowMessageBox(messageboxdata, buttonid) == 0) {
-        retval = 0;
-    }
-#endif
-#if SDL_VIDEO_DRIVER_X11
-    if (retval == -1 &&
-        SDL_MessageboxValidForDriver(messageboxdata, SDL_SYSWM_X11) &&
-        X11_ShowMessageBox(messageboxdata, buttonid) == 0) {
-        retval = 0;
-    }
-#endif
-#if SDL_VIDEO_DRIVER_WAYLAND
-    if (retval == -1 &&
-        SDL_MessageboxValidForDriver(messageboxdata, SDL_SYSWM_WAYLAND) &&
-        Wayland_ShowMessageBox(messageboxdata, buttonid) == 0) {
-        retval = 0;
-    }
-#endif
-#if SDL_VIDEO_DRIVER_HAIKU
-    if (retval == -1 &&
-        SDL_MessageboxValidForDriver(messageboxdata, SDL_SYSWM_HAIKU) &&
-        HAIKU_ShowMessageBox(messageboxdata, buttonid) == 0) {
-        retval = 0;
-    }
-#endif
-#if SDL_VIDEO_DRIVER_OS2
-    if (retval == -1 &&
-        SDL_MessageboxValidForDriver(messageboxdata, SDL_SYSWM_OS2) &&
-        OS2_ShowMessageBox(messageboxdata, buttonid) == 0) {
-        retval = 0;
-    }
-#endif
-#if SDL_VIDEO_DRIVER_RISCOS
-    if (retval == -1 &&
-        SDL_MessageboxValidForDriver(messageboxdata, SDL_SYSWM_RISCOS) &&
-        RISCOS_ShowMessageBox(messageboxdata, buttonid) == 0) {
-        retval = 0;
-    }
-#endif
-#if SDL_VIDEO_DRIVER_VITA
-    if (retval == -1 &&
-        VITA_ShowMessageBox(messageboxdata, buttonid) == 0) {
-        retval = 0;
-    }
-#endif
     if (retval == -1) {
         const char *error = SDL_GetError();
 
@@ -4623,28 +3266,12 @@ SDL_ShowMessageBox(const SDL_MessageBoxData *messageboxdata, int *buttonid)
         SDL_RaiseWindow(current_window);
     }
 
-    SDL_ShowCursor(show_cursor_prev);
-    SDL_SetRelativeMouseMode(relative_mode);
-    SDL_UpdateMouseCapture(SDL_FALSE);
-
     return retval;
 }
 
 int
 SDL_ShowSimpleMessageBox(Uint32 flags, const char *title, const char *message, SDL_Window *window)
 {
-#ifdef __EMSCRIPTEN__
-    /* !!! FIXME: propose a browser API for this, get this #ifdef out of here? */
-    /* Web browsers don't (currently) have an API for a custom message box
-       that can block, but for the most common case (SDL_ShowSimpleMessageBox),
-       we can use the standard Javascript alert() function. */
-    if (!title) title = "";
-    if (!message) message = "";
-    EM_ASM_({
-        alert(UTF8ToString($0) + "\n\n" + UTF8ToString($1));
-    }, title, message);
-    return 0;
-#else
     SDL_MessageBoxData data;
     SDL_MessageBoxButtonData button;
 
@@ -4662,7 +3289,6 @@ SDL_ShowSimpleMessageBox(Uint32 flags, const char *title, const char *message, S
     button.text = "OK";
 
     return SDL_ShowMessageBox(&data, NULL);
-#endif
 }
 
 SDL_bool
@@ -4745,172 +3371,6 @@ void SDL_OnApplicationDidBecomeActive(void)
             SDL_SendWindowEvent(window, SDL_WINDOWEVENT_FOCUS_GAINED, 0, 0);
             SDL_SendWindowEvent(window, SDL_WINDOWEVENT_RESTORED, 0, 0);
         }
-    }
-}
-
-#define NOT_A_VULKAN_WINDOW "The specified window isn't a Vulkan window"
-
-int SDL_Vulkan_LoadLibrary(const char *path)
-{
-    int retval;
-    if (!_this) {
-        SDL_UninitializedVideo();
-        return -1;
-    }
-    if (_this->vulkan_config.loader_loaded) {
-        if (path && SDL_strcmp(path, _this->vulkan_config.loader_path) != 0) {
-            return SDL_SetError("Vulkan loader library already loaded");
-        }
-        retval = 0;
-    } else {
-        if (!_this->Vulkan_LoadLibrary) {
-            return SDL_DllNotSupported("Vulkan");
-        }
-        retval = _this->Vulkan_LoadLibrary(_this, path);
-    }
-    if (retval == 0) {
-        _this->vulkan_config.loader_loaded++;
-    }
-    return retval;
-}
-
-void *SDL_Vulkan_GetVkGetInstanceProcAddr(void)
-{
-    if (!_this) {
-        SDL_UninitializedVideo();
-        return NULL;
-    }
-    if (!_this->vulkan_config.loader_loaded) {
-        SDL_SetError("No Vulkan loader has been loaded");
-        return NULL;
-    }
-    return _this->vulkan_config.vkGetInstanceProcAddr;
-}
-
-void SDL_Vulkan_UnloadLibrary(void)
-{
-    if (!_this) {
-        SDL_UninitializedVideo();
-        return;
-    }
-    if (_this->vulkan_config.loader_loaded > 0) {
-        if (--_this->vulkan_config.loader_loaded > 0) {
-            return;
-        }
-        if (_this->Vulkan_UnloadLibrary) {
-            _this->Vulkan_UnloadLibrary(_this);
-        }
-    }
-}
-
-SDL_bool SDL_Vulkan_GetInstanceExtensions(SDL_Window *window, unsigned *count, const char **names)
-{
-    if (window) {
-        CHECK_WINDOW_MAGIC(window, SDL_FALSE);
-
-        if (!(window->flags & SDL_WINDOW_VULKAN))
-        {
-            SDL_SetError(NOT_A_VULKAN_WINDOW);
-            return SDL_FALSE;
-        }
-    }
-
-    if (!count) {
-        SDL_InvalidParamError("count");
-        return SDL_FALSE;
-    }
-
-    return _this->Vulkan_GetInstanceExtensions(_this, window, count, names);
-}
-
-SDL_bool SDL_Vulkan_CreateSurface(SDL_Window *window,
-                                  VkInstance instance,
-                                  VkSurfaceKHR *surface)
-{
-    CHECK_WINDOW_MAGIC(window, SDL_FALSE);
-
-    if (!(window->flags & SDL_WINDOW_VULKAN)) {
-        SDL_SetError(NOT_A_VULKAN_WINDOW);
-        return SDL_FALSE;
-    }
-
-    if (!instance) {
-        SDL_InvalidParamError("instance");
-        return SDL_FALSE;
-    }
-
-    if (!surface) {
-        SDL_InvalidParamError("surface");
-        return SDL_FALSE;
-    }
-
-    return _this->Vulkan_CreateSurface(_this, window, instance, surface);
-}
-
-void SDL_Vulkan_GetDrawableSize(SDL_Window * window, int *w, int *h)
-{
-    CHECK_WINDOW_MAGIC(window,);
-
-    if (_this->Vulkan_GetDrawableSize) {
-        _this->Vulkan_GetDrawableSize(_this, window, w, h);
-    } else {
-        SDL_GetWindowSizeInPixels(window, w, h);
-    }
-}
-
-SDL_MetalView
-SDL_Metal_CreateView(SDL_Window * window)
-{
-    CHECK_WINDOW_MAGIC(window, NULL);
-
-    if (!(window->flags & SDL_WINDOW_METAL)) {
-        /* No problem, we can convert to Metal */
-        if (window->flags & SDL_WINDOW_OPENGL) {
-            window->flags &= ~SDL_WINDOW_OPENGL;
-            SDL_GL_UnloadLibrary();
-        }
-        if (window->flags & SDL_WINDOW_VULKAN) {
-            window->flags &= ~SDL_WINDOW_VULKAN;
-            SDL_Vulkan_UnloadLibrary();
-        }
-        window->flags |= SDL_WINDOW_METAL;
-    }
-
-    return _this->Metal_CreateView(_this, window);
-}
-
-void
-SDL_Metal_DestroyView(SDL_MetalView view)
-{
-    if (_this && view && _this->Metal_DestroyView) {
-        _this->Metal_DestroyView(_this, view);
-    }
-}
-
-void *
-SDL_Metal_GetLayer(SDL_MetalView view)
-{
-    if (_this && _this->Metal_GetLayer) {
-        if (view) {
-            return _this->Metal_GetLayer(_this, view);
-        } else {
-            SDL_InvalidParamError("view");
-            return NULL;
-        }
-    } else {
-        SDL_SetError("Metal is not supported.");
-        return NULL;
-    }
-}
-
-void SDL_Metal_GetDrawableSize(SDL_Window * window, int *w, int *h)
-{
-    CHECK_WINDOW_MAGIC(window,);
-
-    if (_this->Metal_GetDrawableSize) {
-        _this->Metal_GetDrawableSize(_this, window, w, h);
-    } else {
-        SDL_GetWindowSizeInPixels(window, w, h);
     }
 }
 

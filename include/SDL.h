@@ -49,7 +49,6 @@
 #include "SDL_loadso.h"
 #include "SDL_log.h"
 #include "SDL_messagebox.h"
-#include "SDL_metal.h"
 #include "SDL_mutex.h"
 #include "SDL_power.h"
 #include "SDL_render.h"
@@ -63,6 +62,7 @@
 #include "SDL_video.h"
 #include "SDL_locale.h"
 #include "SDL_misc.h"
+#include "SDL_dummy.h"
 
 #include "begin_code.h"
 /* Set up for C function definitions, even when using C++ */

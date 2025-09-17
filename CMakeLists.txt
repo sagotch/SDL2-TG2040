@@ -459,6 +459,10 @@ set(LONGESTOPTIONNAME 0)  # set_option and friends will change this.
 set(SDL_SUBSYSTEMS
     Atomic Audio Video Render Events Joystick Haptic Hidapi Power Threads Timers
     File Loadso CPUinfo Filesystem Sensor Locale Misc)
+set(SDL_JOYSTICK_ENABLED_BY_DEFAULT OFF)
+set(SDL_HAPTIC_ENABLED_BY_DEFAULT OFF)
+set(SDL_HIDAPI_ENABLED_BY_DEFAULT OFF)
+set(SDL_SENSOR_ENABLED_BY_DEFAULT OFF)
 foreach(_SUB ${SDL_SUBSYSTEMS})
   string(TOUPPER ${_SUB} _OPT)
   if (NOT DEFINED SDL_${_OPT}_ENABLED_BY_DEFAULT)

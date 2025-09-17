@@ -26,9 +26,7 @@
 #include "SDL_messagebox.h"
 #include "SDL_shape.h"
 #include "SDL_thread.h"
-#include "SDL_metal.h"
 
-#include "SDL_vulkan_internal.h"
 
 /* The SDL video driver */
 
@@ -283,25 +281,6 @@ struct SDL_VideoDevice
 
     /* * * */
     /*
-     * Vulkan support
-     */
-    int (*Vulkan_LoadLibrary) (_THIS, const char *path);
-    void (*Vulkan_UnloadLibrary) (_THIS);
-    SDL_bool (*Vulkan_GetInstanceExtensions) (_THIS, SDL_Window *window, unsigned *count, const char **names);
-    SDL_bool (*Vulkan_CreateSurface) (_THIS, SDL_Window *window, VkInstance instance, VkSurfaceKHR *surface);
-    void (*Vulkan_GetDrawableSize) (_THIS, SDL_Window * window, int *w, int *h);
-
-    /* * * */
-    /*
-     * Metal support
-     */
-    SDL_MetalView (*Metal_CreateView) (_THIS, SDL_Window * window);
-    void (*Metal_DestroyView) (_THIS, SDL_MetalView view);
-    void *(*Metal_GetLayer) (_THIS, SDL_MetalView view);
-    void (*Metal_GetDrawableSize) (_THIS, SDL_Window * window, int *w, int *h);
-
-    /* * * */
-    /*
      * Event manager functions
      */
     int (*WaitEventTimeout) (_THIS, int timeout);
@@ -410,17 +389,6 @@ struct SDL_VideoDevice
      * with a NULL window, but a non-NULL context. (Not allowed in most cases,
      * except on EGL under some circumstances.) */
     SDL_bool gl_allow_no_surface;
-
-    /* * * */
-    /* Data used by the Vulkan drivers */
-    struct
-    {
-        PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
-        PFN_vkEnumerateInstanceExtensionProperties vkEnumerateInstanceExtensionProperties;
-        int loader_loaded;
-        char loader_path[256];
-        void *loader_handle;
-    } vulkan_config;
 
     /* * * */
     /* Data private to this driver */

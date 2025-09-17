@@ -49,9 +49,6 @@
 #include "SDL_assert_c.h"
 #include "SDL_log_c.h"
 #include "events/SDL_events_c.h"
-#include "haptic/SDL_haptic_c.h"
-#include "joystick/SDL_joystick_c.h"
-#include "sensor/SDL_sensor_c.h"
 
 /* Initialization/Cleanup routines */
 #if !SDL_TIMERS_DISABLED
@@ -198,18 +195,6 @@ SDL_InitSubSystem(Uint32 flags)
         flags |= SDL_INIT_EVENTS;
     }
 
-#if SDL_THREAD_OS2
-    SDL_OS2TLSAlloc(); /* thread/os2/SDL_systls.c */
-#endif
-
-#if SDL_VIDEO_DRIVER_WINDOWS
-    if ((flags & (SDL_INIT_HAPTIC|SDL_INIT_JOYSTICK))) {
-        if (SDL_HelperWindowCreate() < 0) {
-            goto quit_and_error;
-        }
-    }
-#endif
-
 #if !SDL_TIMERS_DISABLED
     SDL_TicksInit();
 #endif
@@ -278,69 +263,6 @@ SDL_InitSubSystem(Uint32 flags)
 #endif
     }
 
-    /* Initialize the joystick subsystem */
-    if ((flags & SDL_INIT_JOYSTICK)){
-#if !SDL_JOYSTICK_DISABLED
-        if (SDL_PrivateShouldInitSubsystem(SDL_INIT_JOYSTICK)) {
-           if (SDL_JoystickInit() < 0) {
-               goto quit_and_error;
-           }
-        }
-        SDL_PrivateSubsystemRefCountIncr(SDL_INIT_JOYSTICK);
-        flags_initialized |= SDL_INIT_JOYSTICK;
-#else
-        SDL_SetError("SDL not built with joystick support");
-        goto quit_and_error;
-#endif
-    }
-
-    if ((flags & SDL_INIT_GAMECONTROLLER)){
-#if !SDL_JOYSTICK_DISABLED
-        if (SDL_PrivateShouldInitSubsystem(SDL_INIT_GAMECONTROLLER)) {
-            if (SDL_GameControllerInit() < 0) {
-                goto quit_and_error;
-            }
-        }
-        SDL_PrivateSubsystemRefCountIncr(SDL_INIT_GAMECONTROLLER);
-        flags_initialized |= SDL_INIT_GAMECONTROLLER;
-#else
-        SDL_SetError("SDL not built with joystick support");
-        goto quit_and_error;
-#endif
-    }
-
-    /* Initialize the haptic subsystem */
-    if ((flags & SDL_INIT_HAPTIC)){
-#if !SDL_HAPTIC_DISABLED
-        if (SDL_PrivateShouldInitSubsystem(SDL_INIT_HAPTIC)) {
-            if (SDL_HapticInit() < 0) {
-                goto quit_and_error;
-            }
-        }
-        SDL_PrivateSubsystemRefCountIncr(SDL_INIT_HAPTIC);
-        flags_initialized |= SDL_INIT_HAPTIC;
-#else
-        SDL_SetError("SDL not built with haptic (force feedback) support");
-        goto quit_and_error;
-#endif
-    }
-
-    /* Initialize the sensor subsystem */
-    if ((flags & SDL_INIT_SENSOR)){
-#if !SDL_SENSOR_DISABLED
-        if (SDL_PrivateShouldInitSubsystem(SDL_INIT_SENSOR)) {
-            if (SDL_SensorInit() < 0) {
-                goto quit_and_error;
-            }
-        }
-        SDL_PrivateSubsystemRefCountIncr(SDL_INIT_SENSOR);
-        flags_initialized |= SDL_INIT_SENSOR;
-#else
-        SDL_SetError("SDL not built with sensor support");
-        goto quit_and_error;
-#endif
-    }
-
     (void) flags_initialized;  /* make static analysis happy, since this only gets used in error cases. */
 
     return (0);
@@ -359,53 +281,6 @@ SDL_Init(Uint32 flags)
 void
 SDL_QuitSubSystem(Uint32 flags)
 {
-#if defined(__OS2__)
-#if SDL_THREAD_OS2
-    SDL_OS2TLSFree(); /* thread/os2/SDL_systls.c */
-#endif
-    SDL_OS2Quit();
-#endif
-
-    /* Shut down requested initialized subsystems */
-#if !SDL_SENSOR_DISABLED
-    if ((flags & SDL_INIT_SENSOR)) {
-        if (SDL_PrivateShouldQuitSubsystem(SDL_INIT_SENSOR)) {
-            SDL_SensorQuit();
-        }
-        SDL_PrivateSubsystemRefCountDecr(SDL_INIT_SENSOR);
-    }
-#endif
-
-#if !SDL_JOYSTICK_DISABLED
-    if ((flags & SDL_INIT_GAMECONTROLLER)) {
-        /* game controller implies joystick */
-        flags |= SDL_INIT_JOYSTICK;
-
-        if (SDL_PrivateShouldQuitSubsystem(SDL_INIT_GAMECONTROLLER)) {
-            SDL_GameControllerQuit();
-        }
-        SDL_PrivateSubsystemRefCountDecr(SDL_INIT_GAMECONTROLLER);
-    }
-
-    if ((flags & SDL_INIT_JOYSTICK)) {
-        /* joystick implies events */
-        flags |= SDL_INIT_EVENTS;
-
-        if (SDL_PrivateShouldQuitSubsystem(SDL_INIT_JOYSTICK)) {
-            SDL_JoystickQuit();
-        }
-        SDL_PrivateSubsystemRefCountDecr(SDL_INIT_JOYSTICK);
-    }
-#endif
-
-#if !SDL_HAPTIC_DISABLED
-    if ((flags & SDL_INIT_HAPTIC)) {
-        if (SDL_PrivateShouldQuitSubsystem(SDL_INIT_HAPTIC)) {
-            SDL_HapticQuit();
-        }
-        SDL_PrivateSubsystemRefCountDecr(SDL_INIT_HAPTIC);
-    }
-#endif
 
 #if !SDL_AUDIO_DISABLED
     if ((flags & SDL_INIT_AUDIO)) {

@@ -602,15 +602,7 @@ SDL_DYNAPI_PROC(void,SDL_GL_ResetAttributes,(void),(),)
 SDL_DYNAPI_PROC(SDL_bool,SDL_HasAVX,(void),(),return)
 SDL_DYNAPI_PROC(SDL_AssertionHandler,SDL_GetDefaultAssertionHandler,(void),(),return)
 SDL_DYNAPI_PROC(SDL_AssertionHandler,SDL_GetAssertionHandler,(void **a),(a),return)
-#if defined(__WIN32__) || defined(__WINGDK__)
-SDL_DYNAPI_PROC(SDL_bool,SDL_DXGIGetOutputInfo,(int a,int *b, int *c),(a,b,c),return)
-#endif
 SDL_DYNAPI_PROC(SDL_bool,SDL_RenderIsClipEnabled,(SDL_Renderer *a),(a),return)
-#ifdef __WINRT__
-SDL_DYNAPI_PROC(int,SDL_WinRTRunApp,(int a, char **b, void *c),(a,b,c),return)
-SDL_DYNAPI_PROC(const wchar_t*,SDL_WinRTGetFSPathUNICODE,(SDL_WinRT_Path a),(a),return)
-SDL_DYNAPI_PROC(const char*,SDL_WinRTGetFSPathUTF8,(SDL_WinRT_Path a),(a),return)
-#endif
 SDL_DYNAPI_PROC(int,SDL_WarpMouseGlobal,(int a, int b),(a,b),return)
 SDL_DYNAPI_PROC(float,SDL_sqrtf,(float a),(a),return)
 SDL_DYNAPI_PROC(double,SDL_tan,(double a),(a),return)
@@ -623,9 +615,6 @@ SDL_DYNAPI_PROC(int,SDL_QueueAudio,(SDL_AudioDeviceID a, const void *b, Uint32 c
 SDL_DYNAPI_PROC(Uint32,SDL_GetQueuedAudioSize,(SDL_AudioDeviceID a),(a),return)
 SDL_DYNAPI_PROC(void,SDL_ClearQueuedAudio,(SDL_AudioDeviceID a),(a),)
 SDL_DYNAPI_PROC(SDL_Window*,SDL_GetGrabbedWindow,(void),(),return)
-#if defined(__WIN32__) || defined(__GDK__)
-SDL_DYNAPI_PROC(void,SDL_SetWindowsMessageHook,(SDL_WindowsMessageHook a, void *b),(a,b),)
-#endif
 SDL_DYNAPI_PROC(int,SDL_GetDisplayDPI,(int a, float *b, float *c, float *d),(a,b,c,d),return)
 SDL_DYNAPI_PROC(SDL_JoystickPowerLevel,SDL_JoystickCurrentPowerLevel,(SDL_Joystick *a),(a),return)
 SDL_DYNAPI_PROC(SDL_GameController*,SDL_GameControllerFromInstanceID,(SDL_JoystickID a),(a),return)
@@ -702,24 +691,11 @@ SDL_DYNAPI_PROC(SDL_YUV_CONVERSION_MODE,SDL_GetYUVConversionMode,(void),(),retur
 SDL_DYNAPI_PROC(SDL_YUV_CONVERSION_MODE,SDL_GetYUVConversionModeForResolution,(int a, int b),(a,b),return)
 SDL_DYNAPI_PROC(void*,SDL_RenderGetMetalLayer,(SDL_Renderer *a),(a),return)
 SDL_DYNAPI_PROC(void*,SDL_RenderGetMetalCommandEncoder,(SDL_Renderer *a),(a),return)
-#ifdef __WINRT__
-SDL_DYNAPI_PROC(SDL_WinRT_DeviceFamily,SDL_WinRTGetDeviceFamily,(void),(),return)
-#endif
-#ifdef __ANDROID__
-SDL_DYNAPI_PROC(SDL_bool,SDL_IsAndroidTV,(void),(),return)
-#endif
 SDL_DYNAPI_PROC(double,SDL_log10,(double a),(a),return)
 SDL_DYNAPI_PROC(float,SDL_log10f,(float a),(a),return)
 SDL_DYNAPI_PROC(char*,SDL_GameControllerMappingForDeviceIndex,(int a),(a),return)
-#ifdef __LINUX__
 SDL_DYNAPI_PROC(int,SDL_LinuxSetThreadPriority,(Sint64 a, int b),(a,b),return)
-#endif
 SDL_DYNAPI_PROC(SDL_bool,SDL_HasAVX512F,(void),(),return)
-#ifdef __ANDROID__
-SDL_DYNAPI_PROC(SDL_bool,SDL_IsChromebook,(void),(),return)
-SDL_DYNAPI_PROC(SDL_bool,SDL_IsDeXMode,(void),(),return)
-SDL_DYNAPI_PROC(void,SDL_AndroidBackButton,(void),(),)
-#endif
 SDL_DYNAPI_PROC(double,SDL_exp,(double a),(a),return)
 SDL_DYNAPI_PROC(float,SDL_expf,(float a),(a),return)
 SDL_DYNAPI_PROC(wchar_t*,SDL_wcsdup,(const wchar_t *a),(a),return)
@@ -747,13 +723,7 @@ SDL_DYNAPI_PROC(SDL_bool,SDL_HasColorKey,(SDL_Surface *a),(a),return)
 #undef SDL_CreateThreadWithStackSize
 #endif
 
-#if defined(__WIN32__) || defined(__GDK__)
-SDL_DYNAPI_PROC(SDL_Thread*,SDL_CreateThreadWithStackSize,(SDL_ThreadFunction a, const char *b, const size_t c, void *d, pfnSDL_CurrentBeginThread e, pfnSDL_CurrentEndThread f),(a,b,c,d,e,f),return)
-#elif defined(__OS2__)
-SDL_DYNAPI_PROC(SDL_Thread*,SDL_CreateThreadWithStackSize,(SDL_ThreadFunction a, const char *b, const size_t c, void *d, pfnSDL_CurrentBeginThread e, pfnSDL_CurrentEndThread f),(a,b,c,d,e,f),return)
-#else
 SDL_DYNAPI_PROC(SDL_Thread*,SDL_CreateThreadWithStackSize,(SDL_ThreadFunction a, const char *b, const size_t c, void *d),(a,b,c,d),return)
-#endif
 
 SDL_DYNAPI_PROC(int,SDL_JoystickGetDevicePlayerIndex,(int a),(a),return)
 SDL_DYNAPI_PROC(int,SDL_JoystickGetPlayerIndex,(SDL_Joystick *a),(a),return)
@@ -770,9 +740,6 @@ SDL_DYNAPI_PROC(int,SDL_RenderFillRectsF,(SDL_Renderer *a, const SDL_FRect *b, i
 SDL_DYNAPI_PROC(int,SDL_RenderCopyF,(SDL_Renderer *a, SDL_Texture *b, const SDL_Rect *c, const SDL_FRect *d),(a,b,c,d),return)
 SDL_DYNAPI_PROC(int,SDL_RenderCopyExF,(SDL_Renderer *a, SDL_Texture *b, const SDL_Rect *c, const SDL_FRect *d, const double e, const SDL_FPoint *f, const SDL_RendererFlip g),(a,b,c,d,e,f,g),return)
 SDL_DYNAPI_PROC(SDL_TouchDeviceType,SDL_GetTouchDeviceType,(SDL_TouchID a),(a),return)
-#ifdef __IPHONEOS__
-SDL_DYNAPI_PROC(int,SDL_UIKitRunApp,(int a, char *b, SDL_main_func c),(a,b,c),return)
-#endif
 SDL_DYNAPI_PROC(size_t,SDL_SIMDGetAlignment,(void),(),return)
 SDL_DYNAPI_PROC(void*,SDL_SIMDAlloc,(const size_t a),(a),return)
 SDL_DYNAPI_PROC(void,SDL_SIMDFree,(void *a),(a),)
@@ -857,9 +824,6 @@ SDL_DYNAPI_PROC(float,SDL_roundf,(float a),(a),return)
 SDL_DYNAPI_PROC(long,SDL_lround,(double a),(a),return)
 SDL_DYNAPI_PROC(long,SDL_lroundf,(float a),(a),return)
 SDL_DYNAPI_PROC(int,SDL_SoftStretchLinear,(SDL_Surface *a, const SDL_Rect *b, SDL_Surface *c, const SDL_Rect *d),(a,b,c,d),return)
-#if defined(__WIN32__) || defined(__WINGDK__)
-SDL_DYNAPI_PROC(ID3D11Device*,SDL_RenderGetD3D11Device,(SDL_Renderer *a),(a),return)
-#endif
 SDL_DYNAPI_PROC(int,SDL_UpdateNVTexture,(SDL_Texture *a, const SDL_Rect *b, const Uint8 *c, int d, const Uint8 *e, int f),(a,b,c,d,e,f),return)
 SDL_DYNAPI_PROC(void,SDL_SetWindowKeyboardGrab,(SDL_Window *a, SDL_bool b),(a,b),)
 SDL_DYNAPI_PROC(void,SDL_SetWindowMouseGrab,(SDL_Window *a, SDL_bool b),(a,b),)
@@ -873,9 +837,6 @@ SDL_DYNAPI_PROC(int,SDL_isxdigit,(int a),(a),return)
 SDL_DYNAPI_PROC(int,SDL_ispunct,(int a),(a),return)
 SDL_DYNAPI_PROC(int,SDL_isprint,(int a),(a),return)
 SDL_DYNAPI_PROC(int,SDL_isgraph,(int a),(a),return)
-#ifdef __ANDROID__
-SDL_DYNAPI_PROC(int,SDL_AndroidShowToast,(const char *a, int b, int c, int d, int e),(a,b,c,d,e),return)
-#endif
 SDL_DYNAPI_PROC(int,SDL_GetAudioDeviceSpec,(int a, int b, SDL_AudioSpec *c),(a,b,c),return)
 SDL_DYNAPI_PROC(void,SDL_TLSCleanup,(void),(),)
 SDL_DYNAPI_PROC(void,SDL_SetWindowAlwaysOnTop,(SDL_Window *a, SDL_bool b),(a,b),)
@@ -894,9 +855,7 @@ SDL_DYNAPI_PROC(int,SDL_asprintf,(char **a, SDL_PRINTF_FORMAT_STRING const char 
 SDL_DYNAPI_PROC(int,SDL_vasprintf,(char **a, const char *b, va_list c),(a,b,c),return)
 SDL_DYNAPI_PROC(void*,SDL_GetWindowICCProfile,(SDL_Window *a, size_t *b),(a,b),return)
 SDL_DYNAPI_PROC(Uint64,SDL_GetTicks64,(void),(),return)
-#ifdef __LINUX__
 SDL_DYNAPI_PROC(int,SDL_LinuxSetThreadPriorityAndPolicy,(Sint64 a, int b, int c),(a,b,c),return)
-#endif
 SDL_DYNAPI_PROC(const char*,SDL_GameControllerGetAppleSFSymbolsNameForButton,(SDL_GameController *a, SDL_GameControllerButton b),(a,b),return)
 SDL_DYNAPI_PROC(const char*,SDL_GameControllerGetAppleSFSymbolsNameForAxis,(SDL_GameController *a, SDL_GameControllerAxis b),(a,b),return)
 SDL_DYNAPI_PROC(int,SDL_hid_init,(void),(),return)
@@ -927,9 +886,6 @@ SDL_DYNAPI_PROC(SDL_bool,SDL_GameControllerHasRumble,(SDL_GameController *a),(a)
 SDL_DYNAPI_PROC(SDL_bool,SDL_GameControllerHasRumbleTriggers,(SDL_GameController *a),(a),return)
 SDL_DYNAPI_PROC(void,SDL_hid_ble_scan,(SDL_bool a),(a),)
 SDL_DYNAPI_PROC(int,SDL_PremultiplyAlpha,(int a, int b, Uint32 c, const void *d, int e, Uint32 f, void *g, int h),(a,b,c,d,e,f,g,h),return)
-#ifdef __ANDROID__
-SDL_DYNAPI_PROC(int,SDL_AndroidSendMessage,(Uint32 a, int b),(a,b),return)
-#endif
 SDL_DYNAPI_PROC(const char*,SDL_GetTouchName,(int a),(a),return)
 SDL_DYNAPI_PROC(void,SDL_ClearComposition,(void),(),)
 SDL_DYNAPI_PROC(SDL_bool,SDL_IsTextInputShown,(void),(),return)
@@ -951,15 +907,8 @@ SDL_DYNAPI_PROC(void,SDL_GUIDToString,(SDL_GUID a, char *b, int c),(a,b,c),)
 SDL_DYNAPI_PROC(SDL_GUID,SDL_GUIDFromString,(const char *a),(a),return)
 SDL_DYNAPI_PROC(SDL_bool,SDL_HasLSX,(void),(),return)
 SDL_DYNAPI_PROC(SDL_bool,SDL_HasLASX,(void),(),return)
-#if defined(__WIN32__) || defined(__GDK__)
-SDL_DYNAPI_PROC(ID3D12Device*,SDL_RenderGetD3D12Device,(SDL_Renderer *a),(a),return)
-#endif
 SDL_DYNAPI_PROC(size_t,SDL_utf8strnlen,(const char *a, size_t b),(a,b),return)
 
-#if defined(__GDK__)
-SDL_DYNAPI_PROC(int,SDL_GDKGetTaskQueue,(XTaskQueueHandle *a),(a),return)
-SDL_DYNAPI_PROC(int,SDL_GDKRunApp,(SDL_main_func a, void *b),(a,b),return)
-#endif
 SDL_DYNAPI_PROC(void,SDL_GetOriginalMemoryFunctions,(SDL_malloc_func *a, SDL_calloc_func *b, SDL_realloc_func *c, SDL_free_func *d),(a,b,c,d),)
 SDL_DYNAPI_PROC(void,SDL_ResetKeyboard,(void),(),)
 SDL_DYNAPI_PROC(int,SDL_GetDefaultAudioInfo,(char **a, SDL_AudioSpec *b, int c),(a,b,c),return)

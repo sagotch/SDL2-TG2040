@@ -123,30 +123,6 @@ static SDL_Scancode SDL_EVDEV_translate_keycode(int keycode);
 static void SDL_EVDEV_sync_device(SDL_evdevlist_item *item);
 static int SDL_EVDEV_device_removed(const char *dev_path);
 
-#if SDL_USE_LIBUDEV
-static void SDL_EVDEV_udev_callback(SDL_UDEV_deviceevent udev_type, int udev_class,
-    const char *dev_path);
-#endif /* SDL_USE_LIBUDEV */
-
-static Uint8 EVDEV_MouseButtons[] = {
-    SDL_BUTTON_LEFT,            /*  BTN_LEFT        0x110 */
-    SDL_BUTTON_RIGHT,           /*  BTN_RIGHT       0x111 */
-    SDL_BUTTON_MIDDLE,          /*  BTN_MIDDLE      0x112 */
-    SDL_BUTTON_X1,              /*  BTN_SIDE        0x113 */
-    SDL_BUTTON_X2,              /*  BTN_EXTRA       0x114 */
-    SDL_BUTTON_X2 + 1,          /*  BTN_FORWARD     0x115 */
-    SDL_BUTTON_X2 + 2,          /*  BTN_BACK        0x116 */
-    SDL_BUTTON_X2 + 3           /*  BTN_TASK        0x117 */
-};
-
-static int
-SDL_EVDEV_SetRelativeMouseMode(SDL_bool enabled)
-{
-    /* Mice already send relative events through this interface */
-    return 0;
-}
-
-
 int
 SDL_EVDEV_Init(void)
 {
@@ -202,8 +178,6 @@ SDL_EVDEV_Init(void)
 
         _this->kbd = SDL_EVDEV_kbd_init();
     }
-
-    SDL_GetMouse()->SetRelativeMouseMode = SDL_EVDEV_SetRelativeMouseMode;
 
     _this->ref_count += 1;
 
@@ -272,22 +246,13 @@ void
 SDL_EVDEV_Poll(void)
 {
     struct input_event events[32];
-    int i, j, len;
+    int i, len;
     SDL_evdevlist_item *item;
     SDL_Scancode scan_code;
-    int mouse_button;
-    SDL_Mouse *mouse;
-    float norm_x, norm_y, norm_pressure;
 
     if (!_this) {
         return;
     }
-
-#if SDL_USE_LIBUDEV
-    SDL_UDEV_Poll();
-#endif
-
-    mouse = SDL_GetMouse();
 
     for (item = _this->first; item != NULL; item = item->next) {
         while ((len = read(item->fd, events, (sizeof events))) > 0) {
@@ -302,30 +267,6 @@ SDL_EVDEV_Poll(void)
 
                 switch (events[i].type) {
                 case EV_KEY:
-                    if (events[i].code >= BTN_MOUSE && events[i].code < BTN_MOUSE + SDL_arraysize(EVDEV_MouseButtons)) {
-                        mouse_button = events[i].code - BTN_MOUSE;
-                        if (events[i].value == 0) {
-                            SDL_SendMouseButton(mouse->focus, (SDL_MouseID)item->fd, SDL_RELEASED, EVDEV_MouseButtons[mouse_button]);
-                        } else if (events[i].value == 1) {
-                            SDL_SendMouseButton(mouse->focus, (SDL_MouseID)item->fd, SDL_PRESSED, EVDEV_MouseButtons[mouse_button]);
-                        }
-                        break;
-                    }
-
-                    /* BTH_TOUCH event value 1 indicates there is contact with
-                       a touchscreen or trackpad (earlist finger's current
-                       position is sent in EV_ABS ABS_X/ABS_Y, switching to
-                       next finger after earlist is released) */
-                    if (item->is_touchscreen && events[i].code == BTN_TOUCH) {
-                        if (item->touchscreen_data->max_slots == 1) {
-                            if (events[i].value)
-                                item->touchscreen_data->slots[0].delta = EVDEV_TOUCH_SLOTDELTA_DOWN;
-                            else
-                                item->touchscreen_data->slots[0].delta = EVDEV_TOUCH_SLOTDELTA_UP;
-                        }
-                        break;
-                    }
-
                     /* Probably keyboard */
                     scan_code = SDL_EVDEV_translate_keycode(events[i].code);
                     if (scan_code != SDL_SCANCODE_UNKNOWN) {
@@ -338,161 +279,14 @@ SDL_EVDEV_Poll(void)
                     SDL_EVDEV_kbd_keycode(_this->kbd, events[i].code, events[i].value);
                     break;
                 case EV_ABS:
-                    switch(events[i].code) {
-                    case ABS_MT_SLOT:
-                        if (!item->is_touchscreen) /* FIXME: temp hack */
-                            break;
-                        item->touchscreen_data->current_slot = events[i].value;
-                        break;
-                    case ABS_MT_TRACKING_ID:
-                        if (!item->is_touchscreen) /* FIXME: temp hack */
-                            break;
-                        if (events[i].value >= 0) {
-                            item->touchscreen_data->slots[item->touchscreen_data->current_slot].tracking_id = events[i].value;
-                            item->touchscreen_data->slots[item->touchscreen_data->current_slot].delta = EVDEV_TOUCH_SLOTDELTA_DOWN;
-                        } else {
-                            item->touchscreen_data->slots[item->touchscreen_data->current_slot].delta = EVDEV_TOUCH_SLOTDELTA_UP;
-                        }
-                        break;
-                    case ABS_MT_POSITION_X:
-                        if (!item->is_touchscreen) /* FIXME: temp hack */
-                            break;
-                        item->touchscreen_data->slots[item->touchscreen_data->current_slot].x = events[i].value;
-                        if (item->touchscreen_data->slots[item->touchscreen_data->current_slot].delta == EVDEV_TOUCH_SLOTDELTA_NONE) {
-                            item->touchscreen_data->slots[item->touchscreen_data->current_slot].delta = EVDEV_TOUCH_SLOTDELTA_MOVE;
-                        }
-                        break;
-                    case ABS_MT_POSITION_Y:
-                        if (!item->is_touchscreen) /* FIXME: temp hack */
-                            break;
-                        item->touchscreen_data->slots[item->touchscreen_data->current_slot].y = events[i].value;
-                        if (item->touchscreen_data->slots[item->touchscreen_data->current_slot].delta == EVDEV_TOUCH_SLOTDELTA_NONE) {
-                            item->touchscreen_data->slots[item->touchscreen_data->current_slot].delta = EVDEV_TOUCH_SLOTDELTA_MOVE;
-                        }
-                        break;
-                    case ABS_MT_PRESSURE:
-                        if (!item->is_touchscreen) /* FIXME: temp hack */
-                            break;
-                        item->touchscreen_data->slots[item->touchscreen_data->current_slot].pressure = events[i].value;
-                        if (item->touchscreen_data->slots[item->touchscreen_data->current_slot].delta == EVDEV_TOUCH_SLOTDELTA_NONE) {
-                            item->touchscreen_data->slots[item->touchscreen_data->current_slot].delta = EVDEV_TOUCH_SLOTDELTA_MOVE;
-                        }
-                        break;
-                    case ABS_X:
-                        if (item->is_touchscreen) {
-                            if (item->touchscreen_data->max_slots != 1)
-                                break;
-                            item->touchscreen_data->slots[0].x = events[i].value;
-                        } else if (!item->relative_mouse) {
-                            /* FIXME: Normalize to input device's reported input range (EVIOCGABS) */
-                            item->mouse_x = events[i].value;
-                        }
-                        break;
-                    case ABS_Y:
-                        if (item->is_touchscreen) {
-                            if (item->touchscreen_data->max_slots != 1)
-                                break;
-                            item->touchscreen_data->slots[0].y = events[i].value;
-                        } else if (!item->relative_mouse) {
-                            /* FIXME: Normalize to input device's reported input range (EVIOCGABS) */
-                            item->mouse_y = events[i].value;
-                        }
-                        break;
-                    default:
-                        break;
-                    }
                     break;
                 case EV_REL:
-                    switch(events[i].code) {
-                    case REL_X:
-                        if (item->relative_mouse)
-                            item->mouse_x += events[i].value;
-                        break;
-                    case REL_Y:
-                        if (item->relative_mouse)
-                            item->mouse_y += events[i].value;
-                        break;
-                    case REL_WHEEL:
-                        if (!item->high_res_wheel)
-                            item->mouse_wheel += events[i].value;
-                        break;
-                    case REL_WHEEL_HI_RES:
-                        SDL_assert(item->high_res_wheel);
-                        item->mouse_wheel += events[i].value;
-                        break;
-                    case REL_HWHEEL:
-                        if (!item->high_res_hwheel)
-                            item->mouse_hwheel += events[i].value;
-                        break;
-                    case REL_HWHEEL_HI_RES:
-                        SDL_assert(item->high_res_hwheel);
-                        item->mouse_hwheel += events[i].value;
-                        break;
-                    default:
-                        break;
-                    }
                     break;
                 case EV_SYN:
                     switch (events[i].code) {
                     case SYN_REPORT:
-                        /* Send mouse axis changes together to ensure consistency and reduce event processing overhead */
-                        if (item->mouse_x != 0 || item->mouse_y != 0) {
-                            SDL_SendMouseMotion(mouse->focus, (SDL_MouseID)item->fd, item->relative_mouse, item->mouse_x, item->mouse_y);
-                            item->mouse_x = item->mouse_y = 0;
-                        }
-                        if (item->mouse_wheel != 0 || item->mouse_hwheel != 0) {
-                            SDL_SendMouseWheel(mouse->focus, (SDL_MouseID)item->fd,
-                                               item->mouse_hwheel / (item->high_res_hwheel ? 120.0f : 1.0f),
-                                               item->mouse_wheel / (item->high_res_wheel ? 120.0f : 1.0f),
-                                               SDL_MOUSEWHEEL_NORMAL);
-                            item->mouse_wheel = item->mouse_hwheel = 0;
-                        }
-
-                        if (!item->is_touchscreen) /* FIXME: temp hack */
-                            break;
-
-                        for(j = 0; j < item->touchscreen_data->max_slots; j++) {
-                            norm_x = (float)(item->touchscreen_data->slots[j].x - item->touchscreen_data->min_x) /
-                                (float)item->touchscreen_data->range_x;
-                            norm_y = (float)(item->touchscreen_data->slots[j].y - item->touchscreen_data->min_y) /
-                                (float)item->touchscreen_data->range_y;
-
-                            if (item->touchscreen_data->range_pressure > 0) {
-                                norm_pressure = (float)(item->touchscreen_data->slots[j].pressure - item->touchscreen_data->min_pressure) /
-                                    (float)item->touchscreen_data->range_pressure;
-                            } else {
-                                /* This touchscreen does not support pressure */
-                                norm_pressure = 1.0f;
-                            }
-
-                            /* FIXME: the touch's window shouldn't be null, but
-                             * the coordinate space of touch positions needs to
-                             * be window-relative in that case. */
-                            switch(item->touchscreen_data->slots[j].delta) {
-                            case EVDEV_TOUCH_SLOTDELTA_DOWN:
-                                SDL_SendTouch(item->fd, item->touchscreen_data->slots[j].tracking_id, NULL, SDL_TRUE, norm_x, norm_y, norm_pressure);
-                                item->touchscreen_data->slots[j].delta = EVDEV_TOUCH_SLOTDELTA_NONE;
-                                break;
-                            case EVDEV_TOUCH_SLOTDELTA_UP:
-                                SDL_SendTouch(item->fd, item->touchscreen_data->slots[j].tracking_id, NULL, SDL_FALSE, norm_x, norm_y, norm_pressure);
-                                item->touchscreen_data->slots[j].tracking_id = -1;
-                                item->touchscreen_data->slots[j].delta = EVDEV_TOUCH_SLOTDELTA_NONE;
-                                break;
-                            case EVDEV_TOUCH_SLOTDELTA_MOVE:
-                                SDL_SendTouchMotion(item->fd, item->touchscreen_data->slots[j].tracking_id, NULL, norm_x, norm_y, norm_pressure);
-                                item->touchscreen_data->slots[j].delta = EVDEV_TOUCH_SLOTDELTA_NONE;
-                                break;
-                            default:
-                                break;
-                            }
-                        }
-
-                        if (item->out_of_sync)
-                            item->out_of_sync = SDL_FALSE;
                         break;
                     case SYN_DROPPED:
-                        if (item->is_touchscreen)
-                            item->out_of_sync = SDL_TRUE;
                         SDL_EVDEV_sync_device(item);
                         break;
                     default:
@@ -525,117 +319,6 @@ SDL_EVDEV_translate_keycode(int keycode)
 #endif /* DEBUG_SCANCODES */
 
     return scancode;
-}
-
-static int
-SDL_EVDEV_init_touchscreen(SDL_evdevlist_item* item, int udev_class)
-{
-    int ret, i;
-    unsigned long xreq, yreq;
-    char name[64];
-    struct input_absinfo abs_info;
-
-    if (!item->is_touchscreen)
-        return 0;
-
-    item->touchscreen_data = SDL_calloc(1, sizeof(*item->touchscreen_data));
-    if (item->touchscreen_data == NULL)
-        return SDL_OutOfMemory();
-
-    ret = ioctl(item->fd, EVIOCGNAME(sizeof(name)), name);
-    if (ret < 0) {
-        SDL_free(item->touchscreen_data);
-        return SDL_SetError("Failed to get evdev touchscreen name");
-    }
-
-    item->touchscreen_data->name = SDL_strdup(name);
-    if (item->touchscreen_data->name == NULL) {
-        SDL_free(item->touchscreen_data);
-        return SDL_OutOfMemory();
-    }
-
-    ret = ioctl(item->fd, EVIOCGABS(ABS_MT_SLOT), &abs_info);
-    if (ret < 0) {
-        SDL_free(item->touchscreen_data->name);
-        SDL_free(item->touchscreen_data);
-        return SDL_SetError("Failed to get evdev touchscreen limits");
-    }
-
-    if (abs_info.maximum == 0) {
-        item->touchscreen_data->max_slots = 1;
-        xreq = EVIOCGABS(ABS_X);
-        yreq = EVIOCGABS(ABS_Y);
-    } else {
-        item->touchscreen_data->max_slots = abs_info.maximum + 1;
-        xreq = EVIOCGABS(ABS_MT_POSITION_X);
-        yreq = EVIOCGABS(ABS_MT_POSITION_Y);
-    }
-
-    ret = ioctl(item->fd, xreq, &abs_info);
-    if (ret < 0) {
-        SDL_free(item->touchscreen_data->name);
-        SDL_free(item->touchscreen_data);
-        return SDL_SetError("Failed to get evdev touchscreen limits");
-    }
-    item->touchscreen_data->min_x = abs_info.minimum;
-    item->touchscreen_data->max_x = abs_info.maximum;
-    item->touchscreen_data->range_x = abs_info.maximum - abs_info.minimum;
-
-    ret = ioctl(item->fd, yreq, &abs_info);
-    if (ret < 0) {
-        SDL_free(item->touchscreen_data->name);
-        SDL_free(item->touchscreen_data);
-        return SDL_SetError("Failed to get evdev touchscreen limits");
-    }
-    item->touchscreen_data->min_y = abs_info.minimum;
-    item->touchscreen_data->max_y = abs_info.maximum;
-    item->touchscreen_data->range_y = abs_info.maximum - abs_info.minimum;
-
-    ret = ioctl(item->fd, EVIOCGABS(ABS_MT_PRESSURE), &abs_info);
-    if (ret < 0) {
-        SDL_free(item->touchscreen_data->name);
-        SDL_free(item->touchscreen_data);
-        return SDL_SetError("Failed to get evdev touchscreen limits");
-    }
-    item->touchscreen_data->min_pressure = abs_info.minimum;
-    item->touchscreen_data->max_pressure = abs_info.maximum;
-    item->touchscreen_data->range_pressure = abs_info.maximum - abs_info.minimum;
-
-    item->touchscreen_data->slots = SDL_calloc(
-        item->touchscreen_data->max_slots,
-        sizeof(*item->touchscreen_data->slots));
-    if (item->touchscreen_data->slots == NULL) {
-        SDL_free(item->touchscreen_data->name);
-        SDL_free(item->touchscreen_data);
-        return SDL_OutOfMemory();
-    }
-
-    for(i = 0; i < item->touchscreen_data->max_slots; i++) {
-        item->touchscreen_data->slots[i].tracking_id = -1;
-    }
-
-    ret = SDL_AddTouch(item->fd, /* I guess our fd is unique enough */
-        (udev_class & SDL_UDEV_DEVICE_TOUCHPAD) ? SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE : SDL_TOUCH_DEVICE_DIRECT,
-        item->touchscreen_data->name);
-    if (ret < 0) {
-        SDL_free(item->touchscreen_data->slots);
-        SDL_free(item->touchscreen_data->name);
-        SDL_free(item->touchscreen_data);
-        return ret;
-    }
-
-    return 0;
-}
-
-static void
-SDL_EVDEV_destroy_touchscreen(SDL_evdevlist_item* item) {
-    if (!item->is_touchscreen)
-        return;
-
-    SDL_DelTouch(item->fd);
-    SDL_free(item->touchscreen_data->slots);
-    SDL_free(item->touchscreen_data->name);
-    SDL_free(item->touchscreen_data);
 }
 
 static void
@@ -766,9 +449,7 @@ SDL_EVDEV_sync_device(SDL_evdevlist_item *item)
 int
 SDL_EVDEV_device_added(const char *dev_path, int udev_class)
 {
-    int ret;
     SDL_evdevlist_item *item;
-    unsigned long relbit[NBITS(REL_MAX)] = { 0 };
 
     /* Check to make sure it's not already in list. */
     for (item = _this->first; item != NULL; item = item->next) {
@@ -793,24 +474,6 @@ SDL_EVDEV_device_added(const char *dev_path, int udev_class)
         close(item->fd);
         SDL_free(item);
         return SDL_OutOfMemory();
-    }
-
-    if (ioctl(item->fd, EVIOCGBIT(EV_REL, sizeof(relbit)), relbit) >= 0) {
-        item->relative_mouse = test_bit(REL_X, relbit) && test_bit(REL_Y, relbit);
-        item->high_res_wheel = test_bit(REL_WHEEL_HI_RES, relbit);
-        item->high_res_hwheel = test_bit(REL_HWHEEL_HI_RES, relbit);
-    }
-
-    /* For now, we just treat a touchpad like a touchscreen */
-    if (udev_class & (SDL_UDEV_DEVICE_TOUCHSCREEN | SDL_UDEV_DEVICE_TOUCHPAD)) {
-        item->is_touchscreen = SDL_TRUE;
-
-        if ((ret = SDL_EVDEV_init_touchscreen(item, udev_class)) < 0) {
-            close(item->fd);
-            SDL_free(item->path);
-            SDL_free(item);
-            return ret;
-        }
     }
 
     if (_this->last == NULL) {
@@ -842,9 +505,6 @@ SDL_EVDEV_device_removed(const char *dev_path)
             }
             if (item == _this->last) {
                 _this->last = prev;
-            }
-            if (item->is_touchscreen) {
-                SDL_EVDEV_destroy_touchscreen(item);
             }
             close(item->fd);
             SDL_free(item->path);
