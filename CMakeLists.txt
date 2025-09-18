@@ -5,9 +5,44 @@ endif()
 cmake_minimum_required(VERSION 3.0.0)
 project(SDL2 C CXX)
 
+# ---------------------------------------------------------------------------
+# Optimization flags for Cortex-A7
+# ---------------------------------------------------------------------------
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+add_compile_options(
+    -march=armv7-a
+    -mfpu=neon-vfpv4
+    -mfloat-abi=hard
+    -O3
+    -ffast-math
+    -fdata-sections
+    -ffunction-sections
+    -fomit-frame-pointer
+)
+
+# Enable IPO/LTO policy
+if(POLICY CMP0069)
+    cmake_policy(SET CMP0069 NEW)
+endif()
+
+# Enable Link-Time Optimization (LTO) if supported
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
+if(ipo_supported)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
+
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections,--as-needed")
+
+set(SDL_SHARED ON CACHE BOOL "Build SDL2 as shared" FORCE)
+set(SDL_STATIC OFF CACHE BOOL "Disable static SDL2" FORCE)
+# ---------------------------------------------------------------------------
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-add_compile_options(-mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard)
 
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
   set(SDL2_SUBPROJECT OFF)
