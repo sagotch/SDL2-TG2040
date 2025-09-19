@@ -124,8 +124,8 @@ typedef enum
     SDL_WINDOW_TOOLTIP          = 0x00040000,   /**< window should be treated as a tooltip */
     SDL_WINDOW_POPUP_MENU       = 0x00080000,   /**< window should be treated as a popup menu */
     SDL_WINDOW_KEYBOARD_GRABBED = 0x00100000,   /**< window has grabbed keyboard input */
-    SDL_WINDOW_VULKAN           = 0x10000000,   /**< window usable for Vulkan surface */
-    SDL_WINDOW_METAL            = 0x20000000,   /**< window usable for Metal view */
+//    SDL_WINDOW_VULKAN           = 0x10000000,   /**< window usable for Vulkan surface */
+//    SDL_WINDOW_METAL            = 0x20000000,   /**< window usable for Metal view */
 
     SDL_WINDOW_INPUT_GRABBED = SDL_WINDOW_MOUSE_GRABBED /**< equivalent to SDL_WINDOW_MOUSE_GRABBED for compatibility */
 } SDL_WindowFlags;

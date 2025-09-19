@@ -1535,7 +1535,7 @@ SDL_UpdateFullscreenMode(SDL_Window * window, SDL_bool fullscreen)
 }
 
 #define CREATE_FLAGS \
-    (SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_SKIP_TASKBAR | SDL_WINDOW_POPUP_MENU | SDL_WINDOW_UTILITY | SDL_WINDOW_TOOLTIP | SDL_WINDOW_VULKAN | SDL_WINDOW_MINIMIZED | SDL_WINDOW_METAL)
+    (SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_SKIP_TASKBAR | SDL_WINDOW_POPUP_MENU | SDL_WINDOW_UTILITY | SDL_WINDOW_TOOLTIP  | SDL_WINDOW_MINIMIZED)
 
 static SDL_INLINE SDL_bool
 IsAcceptingDragAndDrop(void)
@@ -1647,13 +1647,6 @@ SDL_CreateWindow(const char *title, int x, int y, int w, int h, Uint32 flags)
         return NULL;
     }
 
-    /* ensure no more than one of these flags is set */
-    graphics_flags = flags & (SDL_WINDOW_OPENGL | SDL_WINDOW_METAL | SDL_WINDOW_VULKAN);
-    if ((graphics_flags & (graphics_flags - 1)) != 0) {
-        SDL_SetError("Conflicting window flags specified");
-        return NULL;
-    }
-
     /* Some platforms have certain graphics backends enabled by default */
     if (!graphics_flags && !SDL_IsVideoContextExternal()) {
         flags |= SDL_DefaultGraphicsBackends(_this);
@@ -1665,23 +1658,6 @@ SDL_CreateWindow(const char *title, int x, int y, int w, int h, Uint32 flags)
             return NULL;
         }
         if (SDL_GL_LoadLibrary(NULL) < 0) {
-            return NULL;
-        }
-    }
-
-    if (flags & SDL_WINDOW_VULKAN) {
-        if (!_this->Vulkan_CreateSurface) {
-            SDL_ContextNotSupported("Vulkan");
-            return NULL;
-        }
-        if (SDL_Vulkan_LoadLibrary(NULL) < 0) {
-            return NULL;
-        }
-    }
-
-    if (flags & SDL_WINDOW_METAL) {
-        if (!_this->Metal_CreateView) {
-            SDL_ContextNotSupported("Metal");
             return NULL;
         }
     }
@@ -1832,21 +1808,6 @@ SDL_CreateWindowFrom(const void *data)
         flags |= SDL_WINDOW_OPENGL;
     }
 
-    if (SDL_GetHintBoolean(SDL_HINT_VIDEO_FOREIGN_WINDOW_VULKAN, SDL_FALSE)) {
-        if (!_this->Vulkan_CreateSurface) {
-            SDL_ContextNotSupported("Vulkan");
-            return NULL;
-        }
-        if (flags & SDL_WINDOW_OPENGL) {
-            SDL_SetError("Vulkan and OpenGL not supported on same window");
-            return NULL;
-        }
-        if (SDL_Vulkan_LoadLibrary(NULL) < 0) {
-            return NULL;
-        }
-        flags |= SDL_WINDOW_VULKAN;
-    }
-
     window = (SDL_Window *)SDL_calloc(1, sizeof(*window));
     if (!window) {
         SDL_OutOfMemory();
@@ -1882,25 +1843,9 @@ SDL_RecreateWindow(SDL_Window * window, Uint32 flags)
     SDL_bool loaded_opengl = SDL_FALSE;
     SDL_bool need_gl_unload = SDL_FALSE;
     SDL_bool need_gl_load = SDL_FALSE;
-    SDL_bool loaded_vulkan = SDL_FALSE;
-    SDL_bool need_vulkan_unload = SDL_FALSE;
-    SDL_bool need_vulkan_load = SDL_FALSE;
-    Uint32 graphics_flags;
-
-    /* ensure no more than one of these flags is set */
-    graphics_flags = flags & (SDL_WINDOW_OPENGL | SDL_WINDOW_METAL | SDL_WINDOW_VULKAN);
-    if ((graphics_flags & (graphics_flags - 1)) != 0) {
-        return SDL_SetError("Conflicting window flags specified");
-    }
 
     if ((flags & SDL_WINDOW_OPENGL) && !_this->GL_CreateContext) {
         return SDL_ContextNotSupported("OpenGL");
-    }
-    if ((flags & SDL_WINDOW_VULKAN) && !_this->Vulkan_CreateSurface) {
-        return SDL_ContextNotSupported("Vulkan");
-    }
-    if ((flags & SDL_WINDOW_METAL) && !_this->Metal_CreateView) {
-        return SDL_ContextNotSupported("Metal");
     }
 
     if (window->flags & SDL_WINDOW_FOREIGN) {
@@ -1944,23 +1889,8 @@ SDL_RecreateWindow(SDL_Window * window, Uint32 flags)
         need_gl_load  = SDL_TRUE;
     }
 
-    if ((window->flags & SDL_WINDOW_VULKAN) != (flags & SDL_WINDOW_VULKAN)) {
-        if (flags & SDL_WINDOW_VULKAN) {
-            need_vulkan_load = SDL_TRUE;
-        } else {
-            need_vulkan_unload = SDL_TRUE;
-        }
-    } else if (window->flags & SDL_WINDOW_VULKAN) {
-        need_vulkan_unload = SDL_TRUE;
-        need_vulkan_load  = SDL_TRUE;
-    }
-
     if (need_gl_unload) {
         SDL_GL_UnloadLibrary();
-    }
-
-    if (need_vulkan_unload) {
-        SDL_Vulkan_UnloadLibrary();
     }
 
     if (need_gl_load) {
@@ -1968,13 +1898,6 @@ SDL_RecreateWindow(SDL_Window * window, Uint32 flags)
             return -1;
         }
         loaded_opengl = SDL_TRUE;
-    }
-
-    if (need_vulkan_load) {
-        if (SDL_Vulkan_LoadLibrary(NULL) < 0) {
-            return -1;
-        }
-        loaded_vulkan = SDL_TRUE;
     }
 
     window->flags = ((flags & CREATE_FLAGS) | SDL_WINDOW_HIDDEN);
@@ -1986,10 +1909,6 @@ SDL_RecreateWindow(SDL_Window * window, Uint32 flags)
             if (loaded_opengl) {
                 SDL_GL_UnloadLibrary();
                 window->flags &= ~SDL_WINDOW_OPENGL;
-            }
-            if (loaded_vulkan) {
-                SDL_Vulkan_UnloadLibrary();
-                window->flags &= ~SDL_WINDOW_VULKAN;
             }
             return -1;
         }
@@ -3314,9 +3233,6 @@ SDL_DestroyWindow(SDL_Window * window)
     }
     if (window->flags & SDL_WINDOW_OPENGL) {
         SDL_GL_UnloadLibrary();
-    }
-    if (window->flags & SDL_WINDOW_VULKAN) {
-        SDL_Vulkan_UnloadLibrary();
     }
 
     display = SDL_GetDisplayForWindow(window);
@@ -4745,172 +4661,6 @@ void SDL_OnApplicationDidBecomeActive(void)
             SDL_SendWindowEvent(window, SDL_WINDOWEVENT_FOCUS_GAINED, 0, 0);
             SDL_SendWindowEvent(window, SDL_WINDOWEVENT_RESTORED, 0, 0);
         }
-    }
-}
-
-#define NOT_A_VULKAN_WINDOW "The specified window isn't a Vulkan window"
-
-int SDL_Vulkan_LoadLibrary(const char *path)
-{
-    int retval;
-    if (!_this) {
-        SDL_UninitializedVideo();
-        return -1;
-    }
-    if (_this->vulkan_config.loader_loaded) {
-        if (path && SDL_strcmp(path, _this->vulkan_config.loader_path) != 0) {
-            return SDL_SetError("Vulkan loader library already loaded");
-        }
-        retval = 0;
-    } else {
-        if (!_this->Vulkan_LoadLibrary) {
-            return SDL_DllNotSupported("Vulkan");
-        }
-        retval = _this->Vulkan_LoadLibrary(_this, path);
-    }
-    if (retval == 0) {
-        _this->vulkan_config.loader_loaded++;
-    }
-    return retval;
-}
-
-void *SDL_Vulkan_GetVkGetInstanceProcAddr(void)
-{
-    if (!_this) {
-        SDL_UninitializedVideo();
-        return NULL;
-    }
-    if (!_this->vulkan_config.loader_loaded) {
-        SDL_SetError("No Vulkan loader has been loaded");
-        return NULL;
-    }
-    return _this->vulkan_config.vkGetInstanceProcAddr;
-}
-
-void SDL_Vulkan_UnloadLibrary(void)
-{
-    if (!_this) {
-        SDL_UninitializedVideo();
-        return;
-    }
-    if (_this->vulkan_config.loader_loaded > 0) {
-        if (--_this->vulkan_config.loader_loaded > 0) {
-            return;
-        }
-        if (_this->Vulkan_UnloadLibrary) {
-            _this->Vulkan_UnloadLibrary(_this);
-        }
-    }
-}
-
-SDL_bool SDL_Vulkan_GetInstanceExtensions(SDL_Window *window, unsigned *count, const char **names)
-{
-    if (window) {
-        CHECK_WINDOW_MAGIC(window, SDL_FALSE);
-
-        if (!(window->flags & SDL_WINDOW_VULKAN))
-        {
-            SDL_SetError(NOT_A_VULKAN_WINDOW);
-            return SDL_FALSE;
-        }
-    }
-
-    if (!count) {
-        SDL_InvalidParamError("count");
-        return SDL_FALSE;
-    }
-
-    return _this->Vulkan_GetInstanceExtensions(_this, window, count, names);
-}
-
-SDL_bool SDL_Vulkan_CreateSurface(SDL_Window *window,
-                                  VkInstance instance,
-                                  VkSurfaceKHR *surface)
-{
-    CHECK_WINDOW_MAGIC(window, SDL_FALSE);
-
-    if (!(window->flags & SDL_WINDOW_VULKAN)) {
-        SDL_SetError(NOT_A_VULKAN_WINDOW);
-        return SDL_FALSE;
-    }
-
-    if (!instance) {
-        SDL_InvalidParamError("instance");
-        return SDL_FALSE;
-    }
-
-    if (!surface) {
-        SDL_InvalidParamError("surface");
-        return SDL_FALSE;
-    }
-
-    return _this->Vulkan_CreateSurface(_this, window, instance, surface);
-}
-
-void SDL_Vulkan_GetDrawableSize(SDL_Window * window, int *w, int *h)
-{
-    CHECK_WINDOW_MAGIC(window,);
-
-    if (_this->Vulkan_GetDrawableSize) {
-        _this->Vulkan_GetDrawableSize(_this, window, w, h);
-    } else {
-        SDL_GetWindowSizeInPixels(window, w, h);
-    }
-}
-
-SDL_MetalView
-SDL_Metal_CreateView(SDL_Window * window)
-{
-    CHECK_WINDOW_MAGIC(window, NULL);
-
-    if (!(window->flags & SDL_WINDOW_METAL)) {
-        /* No problem, we can convert to Metal */
-        if (window->flags & SDL_WINDOW_OPENGL) {
-            window->flags &= ~SDL_WINDOW_OPENGL;
-            SDL_GL_UnloadLibrary();
-        }
-        if (window->flags & SDL_WINDOW_VULKAN) {
-            window->flags &= ~SDL_WINDOW_VULKAN;
-            SDL_Vulkan_UnloadLibrary();
-        }
-        window->flags |= SDL_WINDOW_METAL;
-    }
-
-    return _this->Metal_CreateView(_this, window);
-}
-
-void
-SDL_Metal_DestroyView(SDL_MetalView view)
-{
-    if (_this && view && _this->Metal_DestroyView) {
-        _this->Metal_DestroyView(_this, view);
-    }
-}
-
-void *
-SDL_Metal_GetLayer(SDL_MetalView view)
-{
-    if (_this && _this->Metal_GetLayer) {
-        if (view) {
-            return _this->Metal_GetLayer(_this, view);
-        } else {
-            SDL_InvalidParamError("view");
-            return NULL;
-        }
-    } else {
-        SDL_SetError("Metal is not supported.");
-        return NULL;
-    }
-}
-
-void SDL_Metal_GetDrawableSize(SDL_Window * window, int *w, int *h)
-{
-    CHECK_WINDOW_MAGIC(window,);
-
-    if (_this->Metal_GetDrawableSize) {
-        _this->Metal_GetDrawableSize(_this, window, w, h);
-    } else {
-        SDL_GetWindowSizeInPixels(window, w, h);
     }
 }
 

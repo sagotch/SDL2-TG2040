@@ -596,12 +596,6 @@
 #define SDL_wcscmp SDL_wcscmp_REAL
 #define SDL_ComposeCustomBlendMode SDL_ComposeCustomBlendMode_REAL
 #define SDL_DuplicateSurface SDL_DuplicateSurface_REAL
-#define SDL_Vulkan_LoadLibrary SDL_Vulkan_LoadLibrary_REAL
-#define SDL_Vulkan_GetVkGetInstanceProcAddr SDL_Vulkan_GetVkGetInstanceProcAddr_REAL
-#define SDL_Vulkan_UnloadLibrary SDL_Vulkan_UnloadLibrary_REAL
-#define SDL_Vulkan_GetInstanceExtensions SDL_Vulkan_GetInstanceExtensions_REAL
-#define SDL_Vulkan_CreateSurface SDL_Vulkan_CreateSurface_REAL
-#define SDL_Vulkan_GetDrawableSize SDL_Vulkan_GetDrawableSize_REAL
 #define SDL_LockJoysticks SDL_LockJoysticks_REAL
 #define SDL_UnlockJoysticks SDL_UnlockJoysticks_REAL
 #define SDL_GetMemoryFunctions SDL_GetMemoryFunctions_REAL
@@ -691,8 +685,6 @@
 #define SDL_RWwrite SDL_RWwrite_REAL
 #define SDL_RWclose SDL_RWclose_REAL
 #define SDL_LoadFile SDL_LoadFile_REAL
-#define SDL_Metal_CreateView SDL_Metal_CreateView_REAL
-#define SDL_Metal_DestroyView SDL_Metal_DestroyView_REAL
 #define SDL_LockTextureToSurface SDL_LockTextureToSurface_REAL
 #define SDL_HasARMSIMD SDL_HasARMSIMD_REAL
 #define SDL_strtokr SDL_strtokr_REAL
@@ -725,8 +717,6 @@
 #define SDL_GetErrorMsg SDL_GetErrorMsg_REAL
 #define SDL_LockSensors SDL_LockSensors_REAL
 #define SDL_UnlockSensors SDL_UnlockSensors_REAL
-#define SDL_Metal_GetLayer SDL_Metal_GetLayer_REAL
-#define SDL_Metal_GetDrawableSize SDL_Metal_GetDrawableSize_REAL
 #define SDL_trunc SDL_trunc_REAL
 #define SDL_truncf SDL_truncf_REAL
 #define SDL_GetPreferredLocales SDL_GetPreferredLocales_REAL
