@@ -49,7 +49,6 @@
 #include "SDL_assert_c.h"
 #include "SDL_log_c.h"
 #include "events/SDL_events_c.h"
-#include "haptic/SDL_haptic_c.h"
 #include "joystick/SDL_joystick_c.h"
 #include "sensor/SDL_sensor_c.h"
 
@@ -198,18 +197,6 @@ SDL_InitSubSystem(Uint32 flags)
         flags |= SDL_INIT_EVENTS;
     }
 
-#if SDL_THREAD_OS2
-    SDL_OS2TLSAlloc(); /* thread/os2/SDL_systls.c */
-#endif
-
-#if SDL_VIDEO_DRIVER_WINDOWS
-    if ((flags & (SDL_INIT_HAPTIC|SDL_INIT_JOYSTICK))) {
-        if (SDL_HelperWindowCreate() < 0) {
-            goto quit_and_error;
-        }
-    }
-#endif
-
 #if !SDL_TIMERS_DISABLED
     SDL_TicksInit();
 #endif
@@ -309,22 +296,6 @@ SDL_InitSubSystem(Uint32 flags)
 #endif
     }
 
-    /* Initialize the haptic subsystem */
-    if ((flags & SDL_INIT_HAPTIC)){
-#if !SDL_HAPTIC_DISABLED
-        if (SDL_PrivateShouldInitSubsystem(SDL_INIT_HAPTIC)) {
-            if (SDL_HapticInit() < 0) {
-                goto quit_and_error;
-            }
-        }
-        SDL_PrivateSubsystemRefCountIncr(SDL_INIT_HAPTIC);
-        flags_initialized |= SDL_INIT_HAPTIC;
-#else
-        SDL_SetError("SDL not built with haptic (force feedback) support");
-        goto quit_and_error;
-#endif
-    }
-
     /* Initialize the sensor subsystem */
     if ((flags & SDL_INIT_SENSOR)){
 #if !SDL_SENSOR_DISABLED
@@ -395,15 +366,6 @@ SDL_QuitSubSystem(Uint32 flags)
             SDL_JoystickQuit();
         }
         SDL_PrivateSubsystemRefCountDecr(SDL_INIT_JOYSTICK);
-    }
-#endif
-
-#if !SDL_HAPTIC_DISABLED
-    if ((flags & SDL_INIT_HAPTIC)) {
-        if (SDL_PrivateShouldQuitSubsystem(SDL_INIT_HAPTIC)) {
-            SDL_HapticQuit();
-        }
-        SDL_PrivateSubsystemRefCountDecr(SDL_INIT_HAPTIC);
     }
 #endif
 
