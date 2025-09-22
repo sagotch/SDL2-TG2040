@@ -107,7 +107,6 @@ int FBCon_VideoInit(_THIS)
     }
 
     FB0_VINFO.yoffset = 0;
-    FB0_VINFO.activate = FB_ACTIVATE_VBL; // Ask the driver to wait for V-blank before panning
     if (ioctl(FB0_FD, FBIOPAN_DISPLAY, &FB0_VINFO) < 0)
     {
         FBCon_Clean();
