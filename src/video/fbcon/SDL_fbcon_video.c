@@ -64,15 +64,17 @@ FB_DeleteDevice(_THIS)
 static int FB0_FD;
 static int FB0_MMAP_LENGTH = TG2040_SCREEN_VIRTUAL_HEIGHT_640 * TG2040_SCREEN_VIRTUAL_WIDTH_240 * TG2040_SCREEN_BYTES_PER_PIXEL_2;
 static char *FB0_MMAP = NULL;
-static int FB0_BUFFER_LENGTH = TG2040_SCREEN_HEIGHT_320 * TG2040_SCREEN_WIDTH_240 * TG2040_SCREEN_BYTES_PER_PIXEL_2;
-static char *FB0_BUFFER = NULL;
+static struct fb_var_screeninfo FB0_VINFO;
+static int FB0_CURRENT_BUFFER = 0;
+static int BUFFER_LENGTH = TG2040_SCREEN_HEIGHT_320 * TG2040_SCREEN_WIDTH_240 * TG2040_SCREEN_BYTES_PER_PIXEL_2;
+static char *BUFFER = NULL;
 
 void FBCon_Clean()
 {
-    if (FB0_BUFFER != NULL)
+    if (BUFFER != NULL)
     {
-        SDL_free(FB0_BUFFER);
-        FB0_BUFFER = NULL;
+        SDL_free(BUFFER);
+        BUFFER = NULL;
     }
     if (FB0_MMAP != NULL)
     {
@@ -98,6 +100,20 @@ int FBCon_VideoInit(_THIS)
         return SDL_SetError("fbcon: unable to open /dev/fb0");
     }
 
+    if (ioctl(FB0_FD, FBIOGET_VSCREENINFO, &FB0_VINFO) < 0)
+    {
+        FBCon_Clean();
+        return SDL_SetError("fbcon: unable to get screen info with ioctl");
+    }
+
+    FB0_VINFO.yoffset = 0;
+    FB0_VINFO.activate = FB_ACTIVATE_VBL; // Ask the driver to wait for V-blank before panning
+    if (ioctl(FB0_FD, FBIOPAN_DISPLAY, &FB0_VINFO) < 0)
+    {
+        FBCon_Clean();
+        return SDL_SetError(SDL_LOG_CATEGORY_VIDEO, "fbcon: FBIOPAN_DISPLAY failed");
+    }
+
     FB0_MMAP = mmap(NULL, FB0_MMAP_LENGTH, PROT_READ | PROT_WRITE, MAP_SHARED, FB0_FD, 0);
     if (FB0_MMAP == (char *)-1)
     {
@@ -106,8 +122,8 @@ int FBCon_VideoInit(_THIS)
         return SDL_SetError("Unable to memory map the video hardware");
     }
 
-    FB0_BUFFER = SDL_calloc(1, FB0_BUFFER_LENGTH);
-    if (FB0_BUFFER == NULL)
+    BUFFER = SDL_calloc(1, BUFFER_LENGTH);
+    if (BUFFER == NULL)
     {
         FBCon_Clean();
         munmap(FB0_MMAP, FB0_MMAP_LENGTH);
@@ -182,7 +198,7 @@ int FBCon_CreateWindow(_THIS, SDL_Window *window)
     // TG2040 screen is 240x320 screen rotated 90deg clockwise
     surface->w = TG2040_SCREEN_HEIGHT_320;
     surface->h = TG2040_SCREEN_WIDTH_240;
-    surface->pixels = FB0_BUFFER;
+    surface->pixels = BUFFER;
     surface->clip_rect.x = 0;
     surface->clip_rect.y = 0;
     surface->clip_rect.w = TG2040_SCREEN_HEIGHT_320;
@@ -302,10 +318,13 @@ static inline void transpose8x8_u16(
 
 int FBCon_UpdateWindowFramebuffer(_THIS, SDL_Window *window, const SDL_Rect *rects, int numrects)
 {
+    int next_buffer = 1 - FB0_CURRENT_BUFFER;
+    int offset = next_buffer * (TG2040_SCREEN_HEIGHT_320 * TG2040_SCREEN_VIRTUAL_PITCH_480);
+
     // Source: 320x240 pixels (16-bit)
     Uint16 *src = (Uint16 *)window->surface->pixels;
     // Destination: 240x320 pixels (16-bit)
-    Uint16 *dst = (Uint16 *)FB0_MMAP;
+    Uint16 *dst = (Uint16 *)((char *)FB0_MMAP + offset);
 
     int src_w = TG2040_SCREEN_HEIGHT_320;
     int src_w_idx = src_w - 1;
@@ -339,6 +358,10 @@ int FBCon_UpdateWindowFramebuffer(_THIS, SDL_Window *window, const SDL_Rect *rec
             }
         }
     }
+
+    FB0_VINFO.yoffset = next_buffer * TG2040_SCREEN_HEIGHT_320;
+    ioctl(FB0_FD, FBIOPAN_DISPLAY, &FB0_VINFO);
+    FB0_CURRENT_BUFFER = next_buffer;
 
     return 0;
 }
