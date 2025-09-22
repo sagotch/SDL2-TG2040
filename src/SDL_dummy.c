@@ -196,7 +196,6 @@ SDL_DUMMY(SDL_JoystickType, SDL_JoystickGetType, (SDL_Joystick * a), SDL_JOYSTIC
 SDL_DUMMY(SDL_JoystickID, SDL_JoystickGetDeviceInstanceID, (int a), -1)
 SDL_DUMMY_VOID(SDL_LockJoysticks, (void))
 SDL_DUMMY_VOID(SDL_UnlockJoysticks, (void))
-
 SDL_DUMMY(char *, SDL_GameControllerMappingForDeviceIndex, (int a), NULL)
 SDL_DUMMY(int, SDL_GameControllerRumble, (SDL_GameController * a, Uint16 b, Uint16 c, Uint32 d), -1)
 SDL_DUMMY(int, SDL_JoystickRumble, (SDL_Joystick * a, Uint16 b, Uint16 c, Uint32 d), -1)
@@ -278,5 +277,8 @@ SDL_DUMMY(Uint16, SDL_JoystickGetFirmwareVersion, (SDL_Joystick * a), -1)
 SDL_DUMMY_VOID(SDL_GetJoystickGUIDInfo, (SDL_JoystickGUID a, Uint16 *b, Uint16 *c, Uint16 *d, Uint16 *e))
 SDL_DUMMY(int, SDL_GameControllerGetSensorDataWithTimestamp, (SDL_GameController * a, SDL_SensorType b, Uint64 *c, float *d, int e), -1)
 SDL_DUMMY(int, SDL_SensorGetDataWithTimestamp, (SDL_Sensor * a, Uint64 *b, float *c, int d), -1)
+SDL_DUMMY(SDL_YUV_CONVERSION_MODE,SDL_GetYUVConversionMode,(void),SDL_YUV_CONVERSION_AUTOMATIC)
+SDL_DUMMY(SDL_YUV_CONVERSION_MODE,SDL_GetYUVConversionModeForResolution,(int a, int b),SDL_YUV_CONVERSION_AUTOMATIC)
+SDL_DUMMY_VOID(SDL_SetYUVConversionMode,(SDL_YUV_CONVERSION_MODE a))
 
 #undef SDL_DUMMY

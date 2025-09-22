@@ -25,7 +25,6 @@
 #include "SDL_blit.h"
 #include "SDL_RLEaccel_c.h"
 #include "SDL_pixels_c.h"
-#include "SDL_yuv_c.h"
 #include "../render/SDL_sysrender.h"
 
 
@@ -1467,20 +1466,9 @@ int SDL_ConvertPixels(int width, int height,
     if (!dst_pitch) {
         return SDL_InvalidParamError("dst_pitch");
     }
-
-#if SDL_HAVE_YUV
-    if (SDL_ISPIXELFORMAT_FOURCC(src_format) && SDL_ISPIXELFORMAT_FOURCC(dst_format)) {
-        return SDL_ConvertPixels_YUV_to_YUV(width, height, src_format, src, src_pitch, dst_format, dst, dst_pitch);
-    } else if (SDL_ISPIXELFORMAT_FOURCC(src_format)) {
-        return SDL_ConvertPixels_YUV_to_RGB(width, height, src_format, src, src_pitch, dst_format, dst, dst_pitch);
-    } else if (SDL_ISPIXELFORMAT_FOURCC(dst_format)) {
-        return SDL_ConvertPixels_RGB_to_YUV(width, height, src_format, src, src_pitch, dst_format, dst, dst_pitch);
-    }
-#else
     if (SDL_ISPIXELFORMAT_FOURCC(src_format) || SDL_ISPIXELFORMAT_FOURCC(dst_format)) {
         return SDL_SetError("SDL not built with YUV support");
     }
-#endif
 
     /* Fast path for same format copy */
     if (src_format == dst_format) {
