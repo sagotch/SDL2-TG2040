@@ -51,32 +51,16 @@
 
 /* Some compilers use a special export keyword */
 #ifndef DECLSPEC
-# if defined(__WIN32__) || defined(__WINRT__) || defined(__CYGWIN__) || defined(__GDK__)
-#  ifdef DLL_EXPORT
-#   define DECLSPEC __declspec(dllexport)
-#  else
-#   define DECLSPEC
-#  endif
-# elif defined(__OS2__)
-#   ifdef BUILD_SDL
-#    define DECLSPEC    __declspec(dllexport)
-#   else
-#    define DECLSPEC
-#   endif
-# else
 #  if defined(__GNUC__) && __GNUC__ >= 4
 #   define DECLSPEC __attribute__ ((visibility("default")))
 #  else
 #   define DECLSPEC
 #  endif
-# endif
 #endif
 
 /* By default SDL uses the C calling convention */
 #ifndef SDLCALL
-#if (defined(__WIN32__) || defined(__WINRT__) || defined(__GDK__)) && !defined(__GNUC__)
-#define SDLCALL __cdecl
-#elif defined(__OS2__) || defined(__EMX__)
+#if   defined(__OS2__) || defined(__EMX__)
 #define SDLCALL _System
 # if defined (__GNUC__) && !defined(_System)
 #  define _System /* for old EMX/GCC compat.  */
@@ -87,10 +71,6 @@
 #endif /* SDLCALL */
 
 /* Removed DECLSPEC on Symbian OS because SDL cannot be a DLL in EPOC */
-#ifdef __SYMBIAN32__
-#undef DECLSPEC
-#define DECLSPEC
-#endif /* __SYMBIAN32__ */
 
 /* Force structure packing at 4 byte alignment.
    This is necessary if the header is included in code which has structure
@@ -98,21 +78,10 @@
    The packing is reset to the previous value in close_code.h
  */
 #if defined(_MSC_VER) || defined(__MWERKS__) || defined(__BORLANDC__)
-#ifdef _MSC_VER
-#pragma warning(disable: 4103)
-#endif
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wpragma-pack"
 #endif
-#ifdef __BORLANDC__
-#pragma nopackwarning
-#endif
-#ifdef _WIN64
-/* Use 8-byte alignment on 64-bit architectures, so pointers are aligned */
-#pragma pack(push,8)
-#else
 #pragma pack(push,4)
-#endif
 #endif /* Compiler needs structure packing set */
 
 #ifndef SDL_INLINE
@@ -135,9 +104,7 @@
 #endif /* SDL_INLINE not defined */
 
 #ifndef SDL_FORCE_INLINE
-#if defined(_MSC_VER)
-#define SDL_FORCE_INLINE __forceinline
-#elif ( (defined(__GNUC__) && (__GNUC__ >= 4)) || defined(__clang__) )
+#if   ( (defined(__GNUC__) && (__GNUC__ >= 4)) || defined(__clang__) )
 #define SDL_FORCE_INLINE __attribute__((always_inline)) static __inline__
 #else
 #define SDL_FORCE_INLINE static SDL_INLINE
@@ -147,8 +114,6 @@
 #ifndef SDL_NORETURN
 #if defined(__GNUC__)
 #define SDL_NORETURN __attribute__((noreturn))
-#elif defined(_MSC_VER)
-#define SDL_NORETURN __declspec(noreturn)
 #else
 #define SDL_NORETURN
 #endif

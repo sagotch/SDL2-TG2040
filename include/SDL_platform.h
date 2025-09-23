@@ -32,10 +32,6 @@
 #undef __AIX__
 #define __AIX__     1
 #endif
-#if defined(__HAIKU__)
-#undef __HAIKU__
-#define __HAIKU__   1
-#endif
 #if defined(bsdi) || defined(__bsdi) || defined(__bsdi__)
 #undef __BSDI__
 #define __BSDI__    1
@@ -65,62 +61,10 @@
 #undef __LINUX__ /* do we need to do this? */
 #define __ANDROID__ 1
 #endif
-#if defined(__NGAGE__)
-#undef __NGAGE__
-#define __NGAGE__ 1
-#endif
-
-#if defined(__APPLE__)
-/* lets us know what version of Mac OS X we're compiling on */
-#include <AvailabilityMacros.h>
-#include <TargetConditionals.h>
-
-/* Fix building with older SDKs that don't define these
-   See this for more information:
-   https://stackoverflow.com/questions/12132933/preprocessor-macro-for-os-x-targets
-*/
-#ifndef TARGET_OS_MACCATALYST
-#define TARGET_OS_MACCATALYST 0
-#endif
-#ifndef TARGET_OS_IOS
-#define TARGET_OS_IOS 0
-#endif
-#ifndef TARGET_OS_IPHONE
-#define TARGET_OS_IPHONE 0
-#endif
-#ifndef TARGET_OS_TV
-#define TARGET_OS_TV 0
-#endif
-#ifndef TARGET_OS_SIMULATOR
-#define TARGET_OS_SIMULATOR 0
-#endif
-
-#if TARGET_OS_TV
-#undef __TVOS__
-#define __TVOS__ 1
-#endif
-#if TARGET_OS_IPHONE
-/* if compiling for iOS */
-#undef __IPHONEOS__
-#define __IPHONEOS__ 1
-#undef __MACOSX__
-#else
-/* if not compiling for iOS */
-#undef __MACOSX__
-#define __MACOSX__  1
-#if MAC_OS_X_VERSION_MIN_REQUIRED < 1070
-# error SDL for Mac OS X only supports deploying on 10.7 and above.
-#endif /* MAC_OS_X_VERSION_MIN_REQUIRED < 1070 */
-#endif /* TARGET_OS_IPHONE */
-#endif /* defined(__APPLE__) */
 
 #if defined(__NetBSD__)
 #undef __NETBSD__
 #define __NETBSD__  1
-#endif
-#if defined(__OpenBSD__)
-#undef __OPENBSD__
-#define __OPENBSD__ 1
 #endif
 #if defined(__OS2__) || defined(__EMX__)
 #undef __OS2__
@@ -143,56 +87,11 @@
 #define __SOLARIS__ 1
 #endif
 
-#if defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)
-/* Try to find out if we're compiling for WinRT, GDK or non-WinRT/GDK */
-#if defined(_MSC_VER) && defined(__has_include)
-#if __has_include(<winapifamily.h>)
-#define HAVE_WINAPIFAMILY_H 1
-#else
-#define HAVE_WINAPIFAMILY_H 0
-#endif
-
-/* If _USING_V110_SDK71_ is defined it means we are using the Windows XP toolset. */
-#elif defined(_MSC_VER) && (_MSC_VER >= 1700 && !_USING_V110_SDK71_)    /* _MSC_VER == 1700 for Visual Studio 2012 */
-#define HAVE_WINAPIFAMILY_H 1
-#else
-#define HAVE_WINAPIFAMILY_H 0
-#endif
-
-#if HAVE_WINAPIFAMILY_H
-#include <winapifamily.h>
-#define WINAPI_FAMILY_WINRT (!WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP) && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP))
-#else
-#define WINAPI_FAMILY_WINRT 0
-#endif /* HAVE_WINAPIFAMILY_H */
-
-#if WINAPI_FAMILY_WINRT
-#undef __WINRT__
-#define __WINRT__ 1
-#elif defined(_GAMING_DESKTOP) /* GDK project configuration always defines _GAMING_XXX */
-#undef __WINGDK__
-#define __WINGDK__ 1
-#elif defined(_GAMING_XBOX_XBOXONE)
-#undef __XBOXONE__
-#define __XBOXONE__ 1
-#elif defined(_GAMING_XBOX_SCARLETT)
-#undef __XBOXSERIES__
-#define __XBOXSERIES__ 1
-#else
-#undef __WINDOWS__
-#define __WINDOWS__ 1
-#endif
-#endif /* defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__) */
-
 #if defined(__WINDOWS__)
 #undef __WIN32__
 #define __WIN32__ 1
 #endif
 /* This is to support generic "any GDK" separate from a platform-specific GDK */
-#if defined(__WINGDK__) || defined(__XBOXONE__) || defined(__XBOXSERIES__)
-#undef __GDK__
-#define __GDK__ 1
-#endif
 #if defined(__PSP__)
 #undef __PSP__
 #define __PSP__ 1
@@ -219,11 +118,6 @@
 
 #if defined(__vita__)
 #define __VITA__ 1
-#endif
-
-#if defined(__3DS__)
-#undef __3DS__
-#define __3DS__ 1
 #endif
 
 #include "begin_code.h"

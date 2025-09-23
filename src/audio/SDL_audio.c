@@ -36,98 +36,11 @@ static SDL_AudioDevice *open_devices[16];
 
 /* Available audio drivers */
 static const AudioBootStrap *const bootstrap[] = {
-#if SDL_AUDIO_DRIVER_PULSEAUDIO
-    &PULSEAUDIO_bootstrap,
-#endif
 #if SDL_AUDIO_DRIVER_ALSA
     &ALSA_bootstrap,
 #endif
-#if SDL_AUDIO_DRIVER_SNDIO
-    &SNDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_NETBSD
-    &NETBSDAUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_QSA
-    &QSAAUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_SUNAUDIO
-    &SUNAUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_ARTS
-    &ARTS_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_ESD
-    &ESD_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_NACL
-    &NACLAUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_NAS
-    &NAS_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_WASAPI
-    &WASAPI_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_DSOUND
-    &DSOUND_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_WINMM
-    &WINMM_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_PAUDIO
-    &PAUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_HAIKU
-    &HAIKUAUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_COREAUDIO
-    &COREAUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_FUSIONSOUND
-    &FUSIONSOUND_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_AAUDIO
-    &aaudio_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_OPENSLES
-    &openslES_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_ANDROID
-    &ANDROIDAUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_PS2
-    &PS2AUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_PSP
-    &PSPAUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_VITA
-    &VITAAUD_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_N3DS
-    &N3DSAUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_EMSCRIPTEN
-    &EMSCRIPTENAUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_JACK
-    &JACK_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_PIPEWIRE
-    &PIPEWIRE_bootstrap,
-#endif
 #if SDL_AUDIO_DRIVER_OSS
     &DSP_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_OS2
-    &OS2AUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_DISK
-    &DISKAUDIO_bootstrap,
-#endif
-#if SDL_AUDIO_DRIVER_DUMMY
-    &DUMMYAUDIO_bootstrap,
 #endif
     NULL
 };
@@ -710,16 +623,8 @@ SDL_RunAudio(void *devicep)
 
     SDL_assert(!device->iscapture);
 
-#if SDL_AUDIO_DRIVER_ANDROID
-    {
-        /* Set thread priority to THREAD_PRIORITY_AUDIO */
-        extern void Android_JNI_AudioSetThreadPriority(int, int);
-        Android_JNI_AudioSetThreadPriority(device->iscapture, device->id);
-    }
-#else
     /* The audio mixing is always a high priority thread */
     SDL_SetThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
-#endif
 
     /* Perform any thread setup */
     device->threadid = SDL_ThreadID();
@@ -812,16 +717,8 @@ SDL_CaptureAudio(void *devicep)
 
     SDL_assert(device->iscapture);
 
-#if SDL_AUDIO_DRIVER_ANDROID
-    {
-        /* Set thread priority to THREAD_PRIORITY_AUDIO */
-        extern void Android_JNI_AudioSetThreadPriority(int, int);
-        Android_JNI_AudioSetThreadPriority(device->iscapture, device->id);
-    }
-#else
     /* The audio mixing is always a high priority thread */
     SDL_SetThreadPriority(SDL_THREAD_PRIORITY_HIGH);
-#endif
 
     /* Perform any thread setup */
     device->threadid = SDL_ThreadID();
@@ -975,23 +872,6 @@ SDL_AudioInit(const char *driver_name)
             const char *driver_attempt_end = SDL_strchr(driver_attempt, ',');
             size_t driver_attempt_len = (driver_attempt_end != NULL) ? (driver_attempt_end - driver_attempt)
                                                                      : SDL_strlen(driver_attempt);
-#if SDL_AUDIO_DRIVER_DSOUND
-            /* SDL 1.2 uses the name "dsound", so we'll support both. */
-            if (driver_attempt_len == SDL_strlen("dsound") &&
-                (SDL_strncasecmp(driver_attempt, "dsound", driver_attempt_len) == 0)) {
-                driver_attempt = "directsound";
-                driver_attempt_len = SDL_strlen("directsound");
-            }
-#endif
-
-#if SDL_AUDIO_DRIVER_PULSEAUDIO
-            /* SDL 1.2 uses the name "pulse", so we'll support both. */
-            if (driver_attempt_len == SDL_strlen("pulse") &&
-                (SDL_strncasecmp(driver_attempt, "pulse", driver_attempt_len) == 0)) {
-                driver_attempt = "pulseaudio";
-                driver_attempt_len = SDL_strlen("pulseaudio");
-            }
-#endif
 
             for (i = 0; bootstrap[i]; ++i) {
                 if ((driver_attempt_len == SDL_strlen(bootstrap[i]->name)) &&

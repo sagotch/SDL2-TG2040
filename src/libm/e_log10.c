@@ -9,11 +9,6 @@
  * ====================================================
  */
 
-#if defined(_MSC_VER)           /* Handle Microsoft VC++ compiler specifics. */
-/* C4723: potential divide by zero. */
-#pragma warning ( disable : 4723 )
-#endif
-
 /* __ieee754_log10(x)
  * Return the base 10 logarithm of x
  *

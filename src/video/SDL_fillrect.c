@@ -25,112 +25,6 @@
 #include "SDL_cpuinfo.h"
 
 
-#ifdef __SSE__
-/* *INDENT-OFF* */ /* clang-format off */
-
-#if defined(_MSC_VER) && !defined(__clang__)
-#define SSE_BEGIN \
-    __m128 c128; \
-    c128.m128_u32[0] = color; \
-    c128.m128_u32[1] = color; \
-    c128.m128_u32[2] = color; \
-    c128.m128_u32[3] = color;
-#else
-#define SSE_BEGIN \
-    __m128 c128; \
-    DECLARE_ALIGNED(Uint32, cccc[4], 16); \
-    cccc[0] = color; \
-    cccc[1] = color; \
-    cccc[2] = color; \
-    cccc[3] = color; \
-    c128 = *(__m128 *)cccc;
-#endif
-
-#define SSE_WORK \
-    for (i = n / 64; i--;) { \
-        _mm_stream_ps((float *)(p+0), c128); \
-        _mm_stream_ps((float *)(p+16), c128); \
-        _mm_stream_ps((float *)(p+32), c128); \
-        _mm_stream_ps((float *)(p+48), c128); \
-        p += 64; \
-    }
-
-#define SSE_END
-
-#define DEFINE_SSE_FILLRECT(bpp, type) \
-static void \
-SDL_FillRect##bpp##SSE(Uint8 *pixels, int pitch, Uint32 color, int w, int h) \
-{ \
-    int i, n; \
-    Uint8 *p = NULL; \
- \
-    SSE_BEGIN; \
- \
-    while (h--) { \
-        n = w * bpp; \
-        p = pixels; \
- \
-        if (n > 63) { \
-            int adjust = 16 - ((uintptr_t)p & 15); \
-            if (adjust < 16) { \
-                n -= adjust; \
-                adjust /= bpp; \
-                while (adjust--) { \
-                    *((type *)p) = (type)color; \
-                    p += bpp; \
-                } \
-            } \
-            SSE_WORK; \
-        } \
-        if (n & 63) { \
-            int remainder = (n & 63); \
-            remainder /= bpp; \
-            while (remainder--) { \
-                *((type *)p) = (type)color; \
-                p += bpp; \
-            } \
-        } \
-        pixels += pitch; \
-    } \
- \
-    SSE_END; \
-}
-
-static void
-SDL_FillRect1SSE(Uint8 *pixels, int pitch, Uint32 color, int w, int h)
-{
-    int i, n;
-
-    SSE_BEGIN;
-    while (h--) {
-        Uint8 *p = pixels;
-        n = w;
-
-        if (n > 63) {
-            int adjust = 16 - ((uintptr_t)p & 15);
-            if (adjust) {
-                n -= adjust;
-                SDL_memset(p, color, adjust);
-                p += adjust;
-            }
-            SSE_WORK;
-        }
-        if (n & 63) {
-            int remainder = (n & 63);
-            SDL_memset(p, color, remainder);
-        }
-        pixels += pitch;
-    }
-
-    SSE_END;
-}
-/* DEFINE_SSE_FILLRECT(1, Uint8) */
-DEFINE_SSE_FILLRECT(2, Uint16)
-DEFINE_SSE_FILLRECT(4, Uint32)
-
-/* *INDENT-ON* */ /* clang-format on */
-#endif /* __SSE__ */
-
 static void
 SDL_FillRect1(Uint8 * pixels, int pitch, Uint32 color, int w, int h)
 {
@@ -377,12 +271,6 @@ SDL_FillRects(SDL_Surface * dst, const SDL_Rect * rects, int count,
             {
                 color |= (color << 8);
                 color |= (color << 16);
-#ifdef __SSE__
-                if (SDL_HasSSE()) {
-                    fill_function = SDL_FillRect1SSE;
-                    break;
-                }
-#endif
                 fill_function = SDL_FillRect1;
                 break;
             }
@@ -390,12 +278,6 @@ SDL_FillRects(SDL_Surface * dst, const SDL_Rect * rects, int count,
         case 2:
             {
                 color |= (color << 16);
-#ifdef __SSE__
-                if (SDL_HasSSE()) {
-                    fill_function = SDL_FillRect2SSE;
-                    break;
-                }
-#endif
                 fill_function = SDL_FillRect2;
                 break;
             }
@@ -409,12 +291,6 @@ SDL_FillRects(SDL_Surface * dst, const SDL_Rect * rects, int count,
 
         case 4:
             {
-#ifdef __SSE__
-                if (SDL_HasSSE()) {
-                    fill_function = SDL_FillRect4SSE;
-                    break;
-                }
-#endif
                 fill_function = SDL_FillRect4;
                 break;
             }

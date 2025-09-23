@@ -101,30 +101,12 @@ SDL_SoftBlit(SDL_Surface * src, SDL_Rect * srcrect,
 
 #if SDL_HAVE_BLIT_AUTO
 
-#ifdef __MACOSX__
-#include <sys/sysctl.h>
-
-static SDL_bool
-SDL_UseAltivecPrefetch()
-{
-    const char key[] = "hw.l3cachesize";
-    u_int64_t result = 0;
-    size_t typeSize = sizeof(result);
-
-    if (sysctlbyname(key, &result, &typeSize, NULL, 0) == 0 && result > 0) {
-        return SDL_TRUE;
-    } else {
-        return SDL_FALSE;
-    }
-}
-#else
 static SDL_bool
 SDL_UseAltivecPrefetch()
 {
     /* Just guess G4 */
     return SDL_TRUE;
 }
-#endif /* __MACOSX__ */
 
 static SDL_BlitFunc
 SDL_ChooseBlitFunc(Uint32 src_format, Uint32 dst_format, int flags,

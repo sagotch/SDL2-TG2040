@@ -47,20 +47,8 @@ on the assertion line and not in some random guts of SDL, and so each
 assert can have unique static variables associated with it.
 */
 
-#if defined(_MSC_VER)
-/* Don't include intrin.h here because it contains C++ code */
-    extern void __cdecl __debugbreak(void);
-    #define SDL_TriggerBreakpoint() __debugbreak()
-#elif _SDL_HAS_BUILTIN(__builtin_debugtrap)
+#if   _SDL_HAS_BUILTIN(__builtin_debugtrap)
     #define SDL_TriggerBreakpoint() __builtin_debugtrap()
-#elif ( (!defined(__NACL__)) && ((defined(__GNUC__) || defined(__clang__)) && (defined(__i386__) || defined(__x86_64__))) )
-    #define SDL_TriggerBreakpoint() __asm__ __volatile__ ( "int $3\n\t" )
-#elif ( defined(__APPLE__) && (defined(__arm64__) || defined(__aarch64__)) )  /* this might work on other ARM targets, but this is a known quantity... */
-    #define SDL_TriggerBreakpoint() __asm__ __volatile__ ( "brk #22\n\t" )
-#elif defined(__APPLE__) && defined(__arm__)
-    #define SDL_TriggerBreakpoint() __asm__ __volatile__ ( "bkpt #22\n\t" )
-#elif defined(__386__) && defined(__WATCOMC__)
-    #define SDL_TriggerBreakpoint() { _asm { int 0x03 } }
 #elif defined(HAVE_SIGNAL_H) && !defined(__WATCOMC__)
     #include <signal.h>
     #define SDL_TriggerBreakpoint() raise(SIGTRAP)
@@ -96,11 +84,7 @@ disable assertions.
 
 /* "while (0,0)" fools Microsoft's compiler's /W4 warning level into thinking
     this condition isn't constant. And looks like an owl's face! */
-#ifdef _MSC_VER  /* stupid /W4 warnings. */
-#define SDL_NULL_WHILE_LOOP_CONDITION (0,0)
-#else
 #define SDL_NULL_WHILE_LOOP_CONDITION (0)
-#endif
 
 #define SDL_disabled_assert(condition) \
     do { (void) sizeof ((condition)); } while (SDL_NULL_WHILE_LOOP_CONDITION)

@@ -26,9 +26,7 @@
 
 #if HAVE_LIBUDEV_H && HAVE_LINUX_INPUT_H
 
-#ifndef SDL_USE_LIBUDEV
 #define SDL_USE_LIBUDEV 1
-#endif
 
 #include "SDL_loadso.h"
 #include "SDL_events.h"

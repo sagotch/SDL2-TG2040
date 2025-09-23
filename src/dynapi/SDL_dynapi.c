@@ -24,13 +24,6 @@
 
 #if SDL_DYNAMIC_API
 
-#if defined(__OS2__)
-#define INCL_DOS
-#define INCL_DOSERRORS
-#include <os2.h>
-#include <dos.h>
-#endif
-
 #include "SDL.h"
 
 /* These headers have system specific definitions, so aren't included above */
@@ -322,25 +315,7 @@ SDL_DYNAPI_entry(Uint32 apiver, void *table, Uint32 tablesize)
 
 /* Obviously we can't use SDL_LoadObject() to load SDL.  :)  */
 /* Also obviously, we never close the loaded library. */
-#if defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN 1
-#endif
-#include <windows.h>
-static SDL_INLINE void *get_sdlapi_entry(const char *fname, const char *sym)
-{
-    HANDLE lib = LoadLibraryA(fname);
-    void *retval = NULL;
-    if (lib) {
-        retval = GetProcAddress(lib, sym);
-        if (retval == NULL) {
-            FreeLibrary(lib);
-        }
-    }
-    return retval;
-}
-
-#elif defined(unix) || defined(__unix__) || defined(__APPLE__) || defined(__HAIKU__) || defined(__QNX__)
+#if   defined(unix) || defined(__unix__) || defined(__APPLE__) || defined(__HAIKU__) || defined(__QNX__)
 #include <dlfcn.h>
 static SDL_INLINE void *get_sdlapi_entry(const char *fname, const char *sym)
 {
@@ -355,20 +330,6 @@ static SDL_INLINE void *get_sdlapi_entry(const char *fname, const char *sym)
     return retval;
 }
 
-#elif defined(__OS2__)
-static SDL_INLINE void *get_sdlapi_entry(const char *fname, const char *sym)
-{
-    HMODULE hmodule;
-    PFN retval = NULL;
-    char error[256];
-    if (DosLoadModule(error, sizeof(error), fname, &hmodule) == NO_ERROR) {
-        if (DosQueryProcAddr(hmodule, 0, sym, &retval) != NO_ERROR) {
-            DosFreeModule(hmodule);
-        }
-    }
-    return (void *)retval;
-}
-
 #else
 #error Please define your platform.
 #endif
@@ -378,9 +339,7 @@ static void dynapi_warn(const char *msg)
 {
     const char *caption = "SDL Dynamic API Failure!";
     /* SDL_ShowSimpleMessageBox() is a too heavy for here. */
-    #if (defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)) && !defined(__XBOXONE__) && !defined(__XBOXSERIES__)
-    MessageBoxA(NULL, msg, caption, MB_OK | MB_ICONERROR);
-    #elif defined(HAVE_STDIO_H)
+    #if   defined(HAVE_STDIO_H)
     fprintf(stderr, "\n\n%s\n%s\n\n", caption, msg);
     fflush(stderr);
     #endif
@@ -389,10 +348,6 @@ static void dynapi_warn(const char *msg)
 /* This is not declared in any header, although it is shared between some
     parts of SDL, because we don't want anything calling it without an
     extremely good reason. */
-#if defined(__WATCOMC__)
-void SDL_ExitProcess(int exitcode);
-#pragma aux SDL_ExitProcess aborts;
-#endif
 SDL_NORETURN void SDL_ExitProcess(int exitcode);
 
 

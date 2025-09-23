@@ -28,10 +28,6 @@
 #include "SDL_surface.h"
 
 /* pixman ARM blitters are 32 bit only : */
-#if defined(__aarch64__)||defined(_M_ARM64)
-#undef SDL_ARM_SIMD_BLITTERS
-#undef SDL_ARM_NEON_BLITTERS
-#endif
 
 /* Table to do pixel byte expansion */
 extern Uint8* SDL_expand_byte[9];
@@ -120,8 +116,6 @@ extern SDL_BlitFunc SDL_CalculateBlitA(SDL_Surface * surface);
 
 #if defined(__GNUC__)
 #define DECLARE_ALIGNED(t,v,a)  t __attribute__((aligned(a))) v
-#elif defined(_MSC_VER)
-#define DECLARE_ALIGNED(t,v,a)  __declspec(align(a)) t v
 #else
 #define DECLARE_ALIGNED(t,v,a)  t v
 #endif
@@ -469,11 +463,7 @@ do {                                                                    \
 
 
 /* This is a very useful loop for optimizing blitters */
-#if defined(_MSC_VER) && (_MSC_VER == 1300)
-/* There's a bug in the Visual C++ 7 optimizer when compiling this code */
-#else
 #define USE_DUFFS_LOOP
-#endif
 #ifdef USE_DUFFS_LOOP
 
 /* 8-times unrolled loop */
@@ -552,9 +542,6 @@ do {                                                                    \
 #endif /* USE_DUFFS_LOOP */
 
 /* Prevent Visual C++ 6.0 from printing out stupid warnings */
-#if defined(_MSC_VER) && (_MSC_VER >= 600)
-#pragma warning(disable: 4550)
-#endif
 
 #endif /* SDL_blit_h_ */
 

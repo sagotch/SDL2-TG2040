@@ -116,9 +116,7 @@
 /* YUV formats
    - handling of YUV surfaces
    - blitting and conversion functions */
-#ifndef SDL_HAVE_YUV
 #define SDL_HAVE_YUV                    !SDL_LEAN_AND_MEAN
-#endif
 
 #include "SDL_assert.h"
 #include "SDL_log.h"

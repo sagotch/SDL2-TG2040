@@ -3,13 +3,6 @@
 
 #include EXPORT_HEADER
 
-#if defined(_WIN32)
-#include <windows.h>
-BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
-    return TRUE;
-}
-#endif
-
 int MYLIBRARY_EXPORT mylibrary_init(void);
 void MYLIBRARY_EXPORT mylibrary_quit(void);
 int MYLIBRARY_EXPORT mylibrary_work(void);

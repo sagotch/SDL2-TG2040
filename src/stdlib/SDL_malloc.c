@@ -480,39 +480,6 @@ DEFAULT_MMAP_THRESHOLD       default: 256K
 
 */
 
-#ifndef WIN32
-#ifdef _WIN32
-#define WIN32 1
-#endif /* _WIN32 */
-#endif /* WIN32 */
-
-#ifdef WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-#define HAVE_MMAP 1
-#define HAVE_MORECORE 0
-#define LACKS_UNISTD_H
-#define LACKS_SYS_PARAM_H
-#define LACKS_SYS_MMAN_H
-#define LACKS_STRING_H
-#define LACKS_STRINGS_H
-#define LACKS_SYS_TYPES_H
-#define LACKS_ERRNO_H
-#define LACKS_FCNTL_H
-#define MALLOC_FAILURE_ACTION
-#define MMAP_CLEARS 0           /* WINCE and some others apparently don't clear */
-#endif /* WIN32 */
-
-#ifdef __OS2__
-#define INCL_DOS
-#include <os2.h>
-#define HAVE_MMAP 1
-#define HAVE_MORECORE 0
-#define LACKS_SYS_MMAN_H
-#endif  /* __OS2__ */
-
 #if defined(DARWIN) || defined(_DARWIN)
 /* Mac OSX docs advise not to use sbrk; it seems better to use mmap */
 #ifndef HAVE_MORECORE
@@ -1203,10 +1170,6 @@ extern "C"
 
 /*------------------------------ internal #includes ---------------------- */
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4146 )       /* no "unsigned" warnings */
-#endif /* _MSC_VER */
-
 #ifndef LACKS_STDIO_H
 #include <stdio.h>              /* for printing in malloc_stats */
 #endif
@@ -1255,7 +1218,6 @@ extern void *sbrk(ptrdiff_t);
 #endif /* LACKS_UNISTD_H */
 #endif /* HAVE_MMAP */
 
-#ifndef WIN32
 #ifndef malloc_getpagesize
 #  ifdef _SC_PAGESIZE           /* some SVR4 systems omit an underscore */
 #    ifndef _SC_PAGE_SIZE
@@ -1269,9 +1231,6 @@ extern void *sbrk(ptrdiff_t);
 extern size_t getpagesize();
 #      define malloc_getpagesize getpagesize()
 #    else
-#      ifdef WIN32              /* use supplied emulation of getpagesize */
-#        define malloc_getpagesize getpagesize()
-#      else
 #        ifndef LACKS_SYS_PARAM_H
 #          include <sys/param.h>
 #        endif
@@ -1296,10 +1255,8 @@ extern size_t getpagesize();
 #            endif
 #          endif
 #        endif
-#      endif
 #    endif
 #  endif
-#endif
 #endif
 
 /* ------------------- size_t and alignment properties -------------------- */
@@ -1353,7 +1310,6 @@ extern size_t getpagesize();
 #define IS_MMAPPED_BIT       (SIZE_T_ONE)
 #define USE_MMAP_BIT         (SIZE_T_ONE)
 
-#if !defined(WIN32) && !defined (__OS2__)
 #define CALL_MUNMAP(a, s)    munmap((a), (s))
 #define MMAP_PROT            (PROT_READ|PROT_WRITE)
 #if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
@@ -1377,85 +1333,6 @@ static int dev_zero_fd = -1;    /* Cached file descriptor for /dev/zero. */
 
 #define DIRECT_MMAP(s)       CALL_MMAP(s)
 
-#elif defined(__OS2__)
-
-/* OS/2 MMAP via DosAllocMem */
-static void* os2mmap(size_t size) {
-  void* ptr;
-  if (DosAllocMem(&ptr, size, OBJ_ANY|PAG_COMMIT|PAG_READ|PAG_WRITE) &&
-      DosAllocMem(&ptr, size, PAG_COMMIT|PAG_READ|PAG_WRITE))
-    return MFAIL;
-  return ptr;
-}
-
-#define os2direct_mmap(n)     os2mmap(n)
-
-/* This function supports releasing coalesed segments */
-static int os2munmap(void* ptr, size_t size) {
-  while (size) {
-    ULONG ulSize = size;
-    ULONG ulFlags = 0;
-    if (DosQueryMem(ptr, &ulSize, &ulFlags) != 0)
-      return -1;
-    if ((ulFlags & PAG_BASE) == 0 ||(ulFlags & PAG_COMMIT) == 0 ||
-        ulSize > size)
-      return -1;
-    if (DosFreeMem(ptr) != 0)
-      return -1;
-    ptr = ( void * ) ( ( char * ) ptr + ulSize );
-    size -= ulSize;
-  }
-  return 0;
-}
-
-#define CALL_MMAP(s)         os2mmap(s)
-#define CALL_MUNMAP(a, s)    os2munmap((a), (s))
-#define DIRECT_MMAP(s)       os2direct_mmap(s)
-
-#else /* WIN32 */
-
-/* Win32 MMAP via VirtualAlloc */
-static void *
-win32mmap(size_t size)
-{
-    void *ptr =
-        VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-    return (ptr != 0) ? ptr : MFAIL;
-}
-
-/* For direct MMAP, use MEM_TOP_DOWN to minimize interference */
-static void *
-win32direct_mmap(size_t size)
-{
-    void *ptr = VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT | MEM_TOP_DOWN,
-                             PAGE_READWRITE);
-    return (ptr != 0) ? ptr : MFAIL;
-}
-
-/* This function supports releasing coalesed segments */
-static int
-win32munmap(void *ptr, size_t size)
-{
-    MEMORY_BASIC_INFORMATION minfo;
-    char *cptr = ptr;
-    while (size) {
-        if (VirtualQuery(cptr, &minfo, sizeof(minfo)) == 0)
-            return -1;
-        if (minfo.BaseAddress != cptr || minfo.AllocationBase != cptr ||
-            minfo.State != MEM_COMMIT || minfo.RegionSize > size)
-            return -1;
-        if (VirtualFree(cptr, 0, MEM_RELEASE) == 0)
-            return -1;
-        cptr += minfo.RegionSize;
-        size -= minfo.RegionSize;
-    }
-    return 0;
-}
-
-#define CALL_MMAP(s)         win32mmap(s)
-#define CALL_MUNMAP(a, s)    win32munmap((a), (s))
-#define DIRECT_MMAP(s)       win32direct_mmap(s)
-#endif /* WIN32 */
 #endif /* HAVE_MMAP */
 
 #if HAVE_MMAP && HAVE_MREMAP
@@ -1495,7 +1372,6 @@ win32munmap(void *ptr, size_t size)
     unique mparams values are initialized only once.
 */
 
-#if !defined(WIN32) && !defined(__OS2__)
 /* By default use posix locks */
 #include <pthread.h>
 #define MLOCK_T pthread_mutex_t
@@ -1508,53 +1384,6 @@ static MLOCK_T morecore_mutex = PTHREAD_MUTEX_INITIALIZER;
 #endif /* HAVE_MORECORE */
 
 static MLOCK_T magic_init_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-#elif defined(__OS2__)
-#define MLOCK_T HMTX
-#define INITIAL_LOCK(l)      DosCreateMutexSem(0, l, 0, FALSE)
-#define ACQUIRE_LOCK(l)      DosRequestMutexSem(*l, SEM_INDEFINITE_WAIT)
-#define RELEASE_LOCK(l)      DosReleaseMutexSem(*l)
-#if HAVE_MORECORE
-static MLOCK_T morecore_mutex;
-#endif /* HAVE_MORECORE */
-static MLOCK_T magic_init_mutex;
-
-#else /* WIN32 */
-/*
-   Because lock-protected regions have bounded times, and there
-   are no recursive lock calls, we can use simple spinlocks.
-*/
-
-#define MLOCK_T long
-static int
-win32_acquire_lock(MLOCK_T * sl)
-{
-    for (;;) {
-#ifdef InterlockedCompareExchangePointer
-        if (!InterlockedCompareExchange(sl, 1, 0))
-            return 0;
-#else /* Use older void* version */
-        if (!InterlockedCompareExchange((void **) sl, (void *) 1, (void *) 0))
-            return 0;
-#endif /* InterlockedCompareExchangePointer */
-        Sleep(0);
-    }
-}
-
-static void
-win32_release_lock(MLOCK_T * sl)
-{
-    InterlockedExchange(sl, 0);
-}
-
-#define INITIAL_LOCK(l)      *(l)=0
-#define ACQUIRE_LOCK(l)      win32_acquire_lock(l)
-#define RELEASE_LOCK(l)      win32_release_lock(l)
-#if HAVE_MORECORE
-static MLOCK_T morecore_mutex;
-#endif /* HAVE_MORECORE */
-static MLOCK_T magic_init_mutex;
-#endif /* WIN32 */
 
 #define USE_LOCK_BIT               (2U)
 #else /* USE_LOCKS */
@@ -2329,21 +2158,6 @@ static size_t traverse_and_check(mstate m);
 #define treebin_at(M,i)     (&((M)->treebins[i]))
 
 /* assign tree index for size S to variable I */
-#if defined(__GNUC__) && defined(__i386__)
-#define compute_tree_index(S, I)\
-{\
-  size_t X = S >> TREEBIN_SHIFT;\
-  if (X == 0)\
-    I = 0;\
-  else if (X > 0xFFFF)\
-    I = NTREEBINS-1;\
-  else {\
-    unsigned int K;\
-    __asm__("bsrl %1,%0\n\t" : "=r" (K) : "rm"  (X));\
-    I =  (bindex_t)((K << 1) + ((S >> (K + (TREEBIN_SHIFT-1)) & 1)));\
-  }\
-}
-#else /* GNUC */
 #define compute_tree_index(S, I)\
 {\
   size_t X = S >> TREEBIN_SHIFT;\
@@ -2361,7 +2175,6 @@ static size_t traverse_and_check(mstate m);
     I = (K << 1) + ((S >> (K + (TREEBIN_SHIFT-1)) & 1));\
   }\
 }
-#endif /* GNUC */
 
 /* Bit representing maximum resolved size in a treebin at i */
 #define bit_for_tree_index(i) \
@@ -2394,15 +2207,6 @@ static size_t traverse_and_check(mstate m);
 
 /* index corresponding to given bit */
 
-#if defined(__GNUC__) && defined(__i386__)
-#define compute_bit2idx(X, I)\
-{\
-  unsigned int J;\
-  __asm__("bsfl %1,%0\n\t" : "=r" (J) : "rm" (X));\
-  I = (bindex_t)J;\
-}
-
-#else /* GNUC */
 #if  USE_BUILTIN_FFS
 #define compute_bit2idx(X, I) I = ffs(X)-1
 
@@ -2419,7 +2223,6 @@ static size_t traverse_and_check(mstate m);
   I = (bindex_t)(N + Y);\
 }
 #endif /* USE_BUILTIN_FFS */
-#endif /* GNUC */
 
 /* isolate the least set bit of a bitmap */
 #define least_bit(x)         ((x) & -(x))
@@ -2589,23 +2392,9 @@ init_mparams(void)
         }
         RELEASE_MAGIC_INIT_LOCK();
 
-#if !defined(WIN32) && !defined(__OS2__)
         mparams.page_size = malloc_getpagesize;
         mparams.granularity = ((DEFAULT_GRANULARITY != 0) ?
                                DEFAULT_GRANULARITY : mparams.page_size);
-#elif defined (__OS2__)
-        /* if low-memory is used, os2munmap() would break
-           if it were anything other than 64k */
-        mparams.page_size = 4096u;
-        mparams.granularity = 65536u;
-#else /* WIN32 */
-        {
-            SYSTEM_INFO system_info;
-            GetSystemInfo(&system_info);
-            mparams.page_size = system_info.dwPageSize;
-            mparams.granularity = system_info.dwAllocationGranularity;
-        }
-#endif /* WIN32 */
 
         /* Sanity-check configuration:
            size_t must be unsigned and as wide as pointer type.

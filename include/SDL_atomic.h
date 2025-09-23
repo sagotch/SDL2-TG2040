@@ -144,16 +144,9 @@ extern DECLSPEC void SDLCALL SDL_AtomicUnlock(SDL_SpinLock *lock);
  * The compiler barrier prevents the compiler from reordering
  * reads and writes to globally visible variables across the call.
  */
-#if defined(_MSC_VER) && (_MSC_VER > 1200) && !defined(__clang__)
-void _ReadWriteBarrier(void);
-#pragma intrinsic(_ReadWriteBarrier)
-#define SDL_CompilerBarrier()   _ReadWriteBarrier()
-#elif (defined(__GNUC__) && !defined(__EMSCRIPTEN__)) || (defined(__SUNPRO_C) && (__SUNPRO_C >= 0x5120))
+#if   (defined(__GNUC__) && !defined(__EMSCRIPTEN__)) || (defined(__SUNPRO_C) && (__SUNPRO_C >= 0x5120))
 /* This is correct for all CPUs when using GCC or Solaris Studio 12.1+. */
 #define SDL_CompilerBarrier()   __asm__ __volatile__ ("" : : : "memory")
-#elif defined(__WATCOMC__)
-extern __inline void SDL_CompilerBarrier(void);
-#pragma aux SDL_CompilerBarrier = "" parm [] modify exact [];
 #else
 #define SDL_CompilerBarrier()   \
 { SDL_SpinLock _tmp = 0; SDL_AtomicLock(&_tmp); SDL_AtomicUnlock(&_tmp); }
@@ -186,9 +179,6 @@ extern DECLSPEC void SDLCALL SDL_MemoryBarrierAcquireFunction(void);
 #if defined(__GNUC__) && (defined(__powerpc__) || defined(__ppc__))
 #define SDL_MemoryBarrierRelease()   __asm__ __volatile__ ("lwsync" : : : "memory")
 #define SDL_MemoryBarrierAcquire()   __asm__ __volatile__ ("lwsync" : : : "memory")
-#elif defined(__GNUC__) && defined(__aarch64__)
-#define SDL_MemoryBarrierRelease()   __asm__ __volatile__ ("dmb ish" : : : "memory")
-#define SDL_MemoryBarrierAcquire()   __asm__ __volatile__ ("dmb ish" : : : "memory")
 #elif defined(__GNUC__) && defined(__arm__)
 #if 0 /* defined(__LINUX__) || defined(__ANDROID__) */
 /* Information from:
@@ -238,20 +228,10 @@ typedef void (*SDL_KernelMemoryBarrierFunc)();
 #endif
 
 /* "REP NOP" is PAUSE, coded for tools that don't know it by that name. */
-#if (defined(__GNUC__) || defined(__clang__)) && (defined(__i386__) || defined(__x86_64__))
-    #define SDL_CPUPauseInstruction() __asm__ __volatile__("pause\n")  /* Some assemblers can't do REP NOP, so go with PAUSE. */
-#elif (defined(__arm__) && __ARM_ARCH >= 7) || defined(__aarch64__)
+#if   (defined(__arm__) && __ARM_ARCH >= 7) || defined(__aarch64__)
     #define SDL_CPUPauseInstruction() __asm__ __volatile__("yield" ::: "memory")
 #elif (defined(__powerpc__) || defined(__powerpc64__))
     #define SDL_CPUPauseInstruction() __asm__ __volatile__("or 27,27,27");
-#elif defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
-    #define SDL_CPUPauseInstruction() _mm_pause()  /* this is actually "rep nop" and not a SIMD instruction. No inline asm in MSVC x86-64! */
-#elif defined(_MSC_VER) && (defined(_M_ARM) || defined(_M_ARM64))
-    #define SDL_CPUPauseInstruction() __yield()
-#elif defined(__WATCOMC__) && defined(__386__)
-    /* watcom assembler rejects PAUSE if CPU < i686, and it refuses REP NOP as an invalid combination. Hardcode the bytes.  */
-    extern __inline void SDL_CPUPauseInstruction(void);
-    #pragma aux SDL_CPUPauseInstruction = "db 0f3h,90h"
 #else
     #define SDL_CPUPauseInstruction()
 #endif

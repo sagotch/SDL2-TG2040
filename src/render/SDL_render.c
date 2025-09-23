@@ -29,10 +29,6 @@
 #include "software/SDL_render_sw_c.h"
 #include "../video/SDL_pixels_c.h"
 
-#if defined(__ANDROID__)
-#  include "../core/android/SDL_android.h"
-#endif
-
 /* as a courtesy to iOS apps, we don't try to draw when in the background, as
 that will crash the app. However, these apps _should_ have used
 SDL_AddEventWatch to catch SDL_APP_WILLENTERBACKGROUND events and stopped
@@ -91,39 +87,6 @@ this should probably be removed at some point in the future.  --ryan. */
 
 #if !SDL_RENDER_DISABLED
 static const SDL_RenderDriver *render_drivers[] = {
-#if SDL_VIDEO_RENDER_D3D
-    &D3D_RenderDriver,
-#endif
-#if SDL_VIDEO_RENDER_D3D11
-    &D3D11_RenderDriver,
-#endif
-#if SDL_VIDEO_RENDER_D3D12
-    &D3D12_RenderDriver,
-#endif
-#if SDL_VIDEO_RENDER_METAL
-    &METAL_RenderDriver,
-#endif
-#if SDL_VIDEO_RENDER_OGL
-    &GL_RenderDriver,
-#endif
-#if SDL_VIDEO_RENDER_OGL_ES2
-    &GLES2_RenderDriver,
-#endif
-#if SDL_VIDEO_RENDER_OGL_ES
-    &GLES_RenderDriver,
-#endif
-#if SDL_VIDEO_RENDER_DIRECTFB
-    &DirectFB_RenderDriver,
-#endif
-#if SDL_VIDEO_RENDER_PS2 && !SDL_RENDER_DISABLED
-    &PS2_RenderDriver,
-#endif
-#if SDL_VIDEO_RENDER_PSP
-    &PSP_RenderDriver,
-#endif
-#if SDL_VIDEO_RENDER_VITA_GXM
-    &VITA_GXM_RenderDriver,
-#endif
 #if SDL_VIDEO_RENDER_SW
     &SW_RenderDriver
 #endif
@@ -730,13 +693,7 @@ SDL_RendererEventWatch(void *userdata, SDL_Event *event)
                 }
 
                 if (renderer->logical_w) {
-#if defined(__ANDROID__)
-                    /* Don't immediatly flush because the app may be in
-                     * background, and the egl context shouldn't be used. */
-                    SDL_bool flush_viewport_cmd = SDL_FALSE;
-#else
                     SDL_bool flush_viewport_cmd = SDL_TRUE;
-#endif
                     UpdateLogicalSize(renderer, flush_viewport_cmd);
                 } else {
                     /* Window was resized, reset viewport */
@@ -753,12 +710,7 @@ SDL_RendererEventWatch(void *userdata, SDL_Event *event)
                     renderer->viewport.w = (double)w;
                     renderer->viewport.h = (double)h;
                     QueueCmdSetViewport(renderer);
-#if defined(__ANDROID__)
-                    /* Don't immediatly flush because the app may be in
-                     * background, and the egl context shouldn't be used. */
-#else
                     FlushRenderCommandsIfNotBatching(renderer);
-#endif
                 }
 
                 if (saved_target) {
@@ -965,10 +917,6 @@ SDL_CreateRenderer(SDL_Window * window, int index, Uint32 flags)
     SDL_bool batching = SDL_TRUE;
     const char *hint;
 
-#if defined(__ANDROID__)
-    Android_ActivityMutex_Lock_Running();
-#endif
-
     if (!window) {
         SDL_InvalidParamError("window");
         goto error;
@@ -1107,16 +1055,10 @@ SDL_CreateRenderer(SDL_Window * window, int index, Uint32 flags)
     SDL_LogInfo(SDL_LOG_CATEGORY_RENDER,
                 "Created renderer: %s", renderer->info.name);
 
-#if defined(__ANDROID__)
-    Android_ActivityMutex_Unlock();
-#endif
     return renderer;
 
 error:
 
-#if defined(__ANDROID__)
-    Android_ActivityMutex_Unlock();
-#endif
     return NULL;
 
 #else
@@ -1357,11 +1299,7 @@ SDL_CreateTexture(SDL_Renderer * renderer, Uint32 format, int access, int w, int
         renderer->textures = texture;
 
         if (SDL_ISPIXELFORMAT_FOURCC(texture->format)) {
-#if SDL_HAVE_YUV
-            texture->yuv = SDL_SW_CreateYUVTexture(format, w, h);
-#else
             SDL_SetError("SDL not built with YUV support");
-#endif
             if (!texture->yuv) {
                 SDL_DestroyTexture(texture);
                 return NULL;
@@ -1481,17 +1419,6 @@ SDL_CreateTextureFromSurface(SDL_Renderer * renderer, SDL_Surface * surface)
         } else {
             SDL_UpdateTexture(texture, NULL, surface->pixels, surface->pitch);
         }
-
-#if SDL_VIDEO_RENDER_DIRECTFB
-        /* DirectFB allows palette format for textures.
-         * Copy SDL_Surface palette to the texture */
-        if (SDL_ISPIXELFORMAT_INDEXED(format)) {
-            if (SDL_strcasecmp(renderer->info.name, "directfb") == 0) {
-                extern void DirectFB_SetTexturePalette(SDL_Renderer *renderer, SDL_Texture *texture, SDL_Palette *pal);
-                DirectFB_SetTexturePalette(renderer, texture, surface->format->palette);
-            }
-        }
-#endif
 
     } else {
         SDL_PixelFormat *dst_fmt;
@@ -1695,54 +1622,6 @@ SDL_GetTextureUserData(SDL_Texture * texture)
     return texture->userdata;
 }
 
-#if SDL_HAVE_YUV
-static int
-SDL_UpdateTextureYUV(SDL_Texture * texture, const SDL_Rect * rect,
-                     const void *pixels, int pitch)
-{
-    SDL_Texture *native = texture->native;
-    SDL_Rect full_rect;
-
-    if (SDL_SW_UpdateYUVTexture(texture->yuv, rect, pixels, pitch) < 0) {
-        return -1;
-    }
-
-    full_rect.x = 0;
-    full_rect.y = 0;
-    full_rect.w = texture->w;
-    full_rect.h = texture->h;
-    rect = &full_rect;
-
-    if (texture->access == SDL_TEXTUREACCESS_STREAMING) {
-        /* We can lock the texture and copy to it */
-        void *native_pixels = NULL;
-        int native_pitch = 0;
-
-        if (SDL_LockTexture(native, rect, &native_pixels, &native_pitch) < 0) {
-            return -1;
-        }
-        SDL_SW_CopyYUVToRGB(texture->yuv, rect, native->format,
-                            rect->w, rect->h, native_pixels, native_pitch);
-        SDL_UnlockTexture(native);
-    } else {
-        /* Use a temporary buffer for updating */
-        const int temp_pitch = (((rect->w * SDL_BYTESPERPIXEL(native->format)) + 3) & ~3);
-        const size_t alloclen = rect->h * temp_pitch;
-        if (alloclen > 0) {
-            void *temp_pixels = SDL_malloc(alloclen);
-            if (!temp_pixels) {
-                return SDL_OutOfMemory();
-            }
-            SDL_SW_CopyYUVToRGB(texture->yuv, rect, native->format,
-                                rect->w, rect->h, temp_pixels, temp_pitch);
-            SDL_UpdateTexture(native, rect, temp_pixels, temp_pitch);
-            SDL_free(temp_pixels);
-        }
-    }
-    return 0;
-}
-#endif /* SDL_HAVE_YUV */
-
 static int
 SDL_UpdateTextureNative(SDL_Texture * texture, const SDL_Rect * rect,
                         const void *pixels, int pitch)
@@ -1811,10 +1690,6 @@ SDL_UpdateTexture(SDL_Texture * texture, const SDL_Rect * rect,
 
     if (real_rect.w == 0 || real_rect.h == 0) {
         return 0;  /* nothing to do. */
-#if SDL_HAVE_YUV
-    } else if (texture->yuv) {
-        return SDL_UpdateTextureYUV(texture, &real_rect, pixels, pitch);
-#endif
     } else if (texture->native) {
         return SDL_UpdateTextureNative(texture, &real_rect, pixels, pitch);
     } else {
@@ -1826,250 +1701,22 @@ SDL_UpdateTexture(SDL_Texture * texture, const SDL_Rect * rect,
     }
 }
 
-#if SDL_HAVE_YUV
-static int
-SDL_UpdateTextureYUVPlanar(SDL_Texture * texture, const SDL_Rect * rect,
-                           const Uint8 *Yplane, int Ypitch,
-                           const Uint8 *Uplane, int Upitch,
-                           const Uint8 *Vplane, int Vpitch)
-{
-    SDL_Texture *native = texture->native;
-    SDL_Rect full_rect;
-
-    if (SDL_SW_UpdateYUVTexturePlanar(texture->yuv, rect, Yplane, Ypitch, Uplane, Upitch, Vplane, Vpitch) < 0) {
-        return -1;
-    }
-
-    full_rect.x = 0;
-    full_rect.y = 0;
-    full_rect.w = texture->w;
-    full_rect.h = texture->h;
-    rect = &full_rect;
-
-    if (!rect->w || !rect->h) {
-        return 0;  /* nothing to do. */
-    }
-
-    if (texture->access == SDL_TEXTUREACCESS_STREAMING) {
-        /* We can lock the texture and copy to it */
-        void *native_pixels = NULL;
-        int native_pitch = 0;
-
-        if (SDL_LockTexture(native, rect, &native_pixels, &native_pitch) < 0) {
-            return -1;
-        }
-        SDL_SW_CopyYUVToRGB(texture->yuv, rect, native->format,
-                            rect->w, rect->h, native_pixels, native_pitch);
-        SDL_UnlockTexture(native);
-    } else {
-        /* Use a temporary buffer for updating */
-        const int temp_pitch = (((rect->w * SDL_BYTESPERPIXEL(native->format)) + 3) & ~3);
-        const size_t alloclen = rect->h * temp_pitch;
-        if (alloclen > 0) {
-            void *temp_pixels = SDL_malloc(alloclen);
-            if (!temp_pixels) {
-                return SDL_OutOfMemory();
-            }
-            SDL_SW_CopyYUVToRGB(texture->yuv, rect, native->format,
-                                rect->w, rect->h, temp_pixels, temp_pitch);
-            SDL_UpdateTexture(native, rect, temp_pixels, temp_pitch);
-            SDL_free(temp_pixels);
-        }
-    }
-    return 0;
-}
-
-static int
-SDL_UpdateTextureNVPlanar(SDL_Texture * texture, const SDL_Rect * rect,
-                           const Uint8 *Yplane, int Ypitch,
-                           const Uint8 *UVplane, int UVpitch)
-{
-    SDL_Texture *native = texture->native;
-    SDL_Rect full_rect;
-
-    if (SDL_SW_UpdateNVTexturePlanar(texture->yuv, rect, Yplane, Ypitch, UVplane, UVpitch) < 0) {
-        return -1;
-    }
-
-    full_rect.x = 0;
-    full_rect.y = 0;
-    full_rect.w = texture->w;
-    full_rect.h = texture->h;
-    rect = &full_rect;
-
-    if (!rect->w || !rect->h) {
-        return 0;  /* nothing to do. */
-    }
-
-    if (texture->access == SDL_TEXTUREACCESS_STREAMING) {
-        /* We can lock the texture and copy to it */
-        void *native_pixels = NULL;
-        int native_pitch = 0;
-
-        if (SDL_LockTexture(native, rect, &native_pixels, &native_pitch) < 0) {
-            return -1;
-        }
-        SDL_SW_CopyYUVToRGB(texture->yuv, rect, native->format,
-                            rect->w, rect->h, native_pixels, native_pitch);
-        SDL_UnlockTexture(native);
-    } else {
-        /* Use a temporary buffer for updating */
-        const int temp_pitch = (((rect->w * SDL_BYTESPERPIXEL(native->format)) + 3) & ~3);
-        const size_t alloclen = rect->h * temp_pitch;
-        if (alloclen > 0) {
-            void *temp_pixels = SDL_malloc(alloclen);
-            if (!temp_pixels) {
-                return SDL_OutOfMemory();
-            }
-            SDL_SW_CopyYUVToRGB(texture->yuv, rect, native->format,
-                                rect->w, rect->h, temp_pixels, temp_pitch);
-            SDL_UpdateTexture(native, rect, temp_pixels, temp_pitch);
-            SDL_free(temp_pixels);
-        }
-    }
-    return 0;
-}
-
-
-#endif /* SDL_HAVE_YUV */
-
 int SDL_UpdateYUVTexture(SDL_Texture * texture, const SDL_Rect * rect,
                          const Uint8 *Yplane, int Ypitch,
                          const Uint8 *Uplane, int Upitch,
                          const Uint8 *Vplane, int Vpitch)
 {
-#if SDL_HAVE_YUV
-    SDL_Renderer *renderer;
-    SDL_Rect real_rect;
-
-    CHECK_TEXTURE_MAGIC(texture, -1);
-
-    if (!Yplane) {
-        return SDL_InvalidParamError("Yplane");
-    }
-    if (!Ypitch) {
-        return SDL_InvalidParamError("Ypitch");
-    }
-    if (!Uplane) {
-        return SDL_InvalidParamError("Uplane");
-    }
-    if (!Upitch) {
-        return SDL_InvalidParamError("Upitch");
-    }
-    if (!Vplane) {
-        return SDL_InvalidParamError("Vplane");
-    }
-    if (!Vpitch) {
-        return SDL_InvalidParamError("Vpitch");
-    }
-
-    if (texture->format != SDL_PIXELFORMAT_YV12 &&
-        texture->format != SDL_PIXELFORMAT_IYUV) {
-        return SDL_SetError("Texture format must by YV12 or IYUV");
-    }
-
-    real_rect.x = 0;
-    real_rect.y = 0;
-    real_rect.w = texture->w;
-    real_rect.h = texture->h;
-    if (rect) {
-        SDL_IntersectRect(rect, &real_rect, &real_rect);
-    }
-
-    if (real_rect.w == 0 || real_rect.h == 0) {
-        return 0;  /* nothing to do. */
-    }
-
-    if (texture->yuv) {
-        return SDL_UpdateTextureYUVPlanar(texture, &real_rect, Yplane, Ypitch, Uplane, Upitch, Vplane, Vpitch);
-    } else {
-        SDL_assert(!texture->native);
-        renderer = texture->renderer;
-        SDL_assert(renderer->UpdateTextureYUV);
-        if (renderer->UpdateTextureYUV) {
-            if (FlushRenderCommandsIfTextureNeeded(texture) < 0) {
-                return -1;
-            }
-            return renderer->UpdateTextureYUV(renderer, texture, &real_rect, Yplane, Ypitch, Uplane, Upitch, Vplane, Vpitch);
-        } else {
-            return SDL_Unsupported();
-        }
-    }
-#else
     return -1;
-#endif
 }
 
 int SDL_UpdateNVTexture(SDL_Texture * texture, const SDL_Rect * rect,
                          const Uint8 *Yplane, int Ypitch,
                          const Uint8 *UVplane, int UVpitch)
 {
-#if SDL_HAVE_YUV
-    SDL_Renderer *renderer;
-    SDL_Rect real_rect;
-
-    CHECK_TEXTURE_MAGIC(texture, -1);
-
-    if (!Yplane) {
-        return SDL_InvalidParamError("Yplane");
-    }
-    if (!Ypitch) {
-        return SDL_InvalidParamError("Ypitch");
-    }
-    if (!UVplane) {
-        return SDL_InvalidParamError("UVplane");
-    }
-    if (!UVpitch) {
-        return SDL_InvalidParamError("UVpitch");
-    }
-
-    if (texture->format != SDL_PIXELFORMAT_NV12 &&
-        texture->format != SDL_PIXELFORMAT_NV21) {
-        return SDL_SetError("Texture format must by NV12 or NV21");
-    }
-
-    real_rect.x = 0;
-    real_rect.y = 0;
-    real_rect.w = texture->w;
-    real_rect.h = texture->h;
-    if (rect) {
-        SDL_IntersectRect(rect, &real_rect, &real_rect);
-    }
-
-    if (real_rect.w == 0 || real_rect.h == 0) {
-        return 0;  /* nothing to do. */
-    }
-
-    if (texture->yuv) {
-        return SDL_UpdateTextureNVPlanar(texture, &real_rect, Yplane, Ypitch, UVplane, UVpitch);
-    } else {
-        SDL_assert(!texture->native);
-        renderer = texture->renderer;
-        SDL_assert(renderer->UpdateTextureNV);
-        if (renderer->UpdateTextureNV) {
-            if (FlushRenderCommandsIfTextureNeeded(texture) < 0) {
-                return -1;
-            }
-            return renderer->UpdateTextureNV(renderer, texture, &real_rect, Yplane, Ypitch, UVplane, UVpitch);
-        } else {
-            return SDL_Unsupported();
-        }
-    }
-#else
     return -1;
-#endif
 }
 
 
-
-#if SDL_HAVE_YUV
-static int
-SDL_LockTextureYUV(SDL_Texture * texture, const SDL_Rect * rect,
-                   void **pixels, int *pitch)
-{
-    return SDL_SW_LockYUVTexture(texture->yuv, rect, pixels, pitch);
-}
-#endif /* SDL_HAVE_YUV */
 
 static int
 SDL_LockTextureNative(SDL_Texture * texture, const SDL_Rect * rect,
@@ -2103,14 +1750,6 @@ SDL_LockTexture(SDL_Texture * texture, const SDL_Rect * rect,
         rect = &full_rect;
     }
 
-#if SDL_HAVE_YUV
-    if (texture->yuv) {
-        if (FlushRenderCommandsIfTextureNeeded(texture) < 0) {
-            return -1;
-        }
-        return SDL_LockTextureYUV(texture, rect, pixels, pitch);
-    } else
-#endif
     if (texture->native) {
         /* Calls a real SDL_LockTexture/SDL_UnlockTexture on unlock, flushing then. */
         return SDL_LockTextureNative(texture, rect, pixels, pitch);
@@ -2159,29 +1798,6 @@ SDL_LockTextureToSurface(SDL_Texture *texture, const SDL_Rect *rect,
     return 0;
 }
 
-#if SDL_HAVE_YUV
-static void
-SDL_UnlockTextureYUV(SDL_Texture * texture)
-{
-    SDL_Texture *native = texture->native;
-    void *native_pixels = NULL;
-    int native_pitch = 0;
-    SDL_Rect rect;
-
-    rect.x = 0;
-    rect.y = 0;
-    rect.w = texture->w;
-    rect.h = texture->h;
-
-    if (SDL_LockTexture(native, &rect, &native_pixels, &native_pitch) < 0) {
-        return;
-    }
-    SDL_SW_CopyYUVToRGB(texture->yuv, &rect, native->format,
-                        rect.w, rect.h, native_pixels, native_pitch);
-    SDL_UnlockTexture(native);
-}
-#endif /* SDL_HAVE_YUV */
-
 static void
 SDL_UnlockTextureNative(SDL_Texture * texture)
 {
@@ -2211,11 +1827,6 @@ SDL_UnlockTexture(SDL_Texture * texture)
     if (texture->access != SDL_TEXTUREACCESS_STREAMING) {
         return;
     }
-#if SDL_HAVE_YUV
-    if (texture->yuv) {
-        SDL_UnlockTextureYUV(texture);
-    } else
-#endif
     if (texture->native) {
         SDL_UnlockTextureNative(texture);
     } else {
@@ -2345,20 +1956,7 @@ UpdateLogicalSize(SDL_Renderer *renderer, SDL_bool flush_viewport_cmd)
 
     hint = SDL_GetHint(SDL_HINT_RENDER_LOGICAL_SIZE_MODE);
     if (hint && (*hint == '1' || SDL_strcasecmp(hint, "overscan") == 0))  {
-#if SDL_VIDEO_RENDER_D3D
-        SDL_bool overscan_supported = SDL_TRUE;
-        /* Unfortunately, Direct3D 9 doesn't support negative viewport numbers
-           which the overscan implementation relies on.
-        */
-        if (SDL_strcasecmp(SDL_GetCurrentVideoDriver(), "direct3d") == 0) {
-            overscan_supported = SDL_FALSE;
-        }
-        if (overscan_supported) {
-            scale_policy = 1;
-        }
-#else
         scale_policy = 1;
-#endif
     }
 
     want_aspect = (float)renderer->logical_w / renderer->logical_h;
@@ -4384,11 +3982,6 @@ SDL_DestroyTexture(SDL_Texture * texture)
     if (texture->native) {
         SDL_DestroyTexture(texture->native);
     }
-#if SDL_HAVE_YUV
-    if (texture->yuv) {
-        SDL_SW_DestroyYUVTexture(texture->yuv);
-    }
-#endif
     SDL_free(texture->pixels);
 
     renderer->DestroyTexture(renderer, texture);

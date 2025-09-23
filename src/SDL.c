@@ -20,26 +20,10 @@
 */
 #include "./SDL_internal.h"
 
-#if defined(__WIN32__) || defined(__GDK__)
-#include "core/windows/SDL_windows.h"
-#elif defined(__OS2__)
-#include <stdlib.h> /* _exit() */
-#elif !defined(__WINRT__)
 #include <unistd.h> /* _exit(), etc. */
-#endif
-#if defined(__OS2__)
-#include "core/os2/SDL_os2.h"
-#if SDL_THREAD_OS2
-#include "thread/os2/SDL_systls_c.h"
-#endif
-#endif
 
 /* this checks for HAVE_DBUS_DBUS_H internally. */
 #include "core/linux/SDL_dbus.h"
-
-#if defined(__EMSCRIPTEN__)
-#include <emscripten.h>
-#endif
 
 /* Initialization code for SDL */
 
@@ -53,10 +37,6 @@
 /* Initialization/Cleanup routines */
 #if !SDL_TIMERS_DISABLED
 # include "timer/SDL_timer_c.h"
-#endif
-#if SDL_VIDEO_DRIVER_WINDOWS
-extern int SDL_HelperWindowCreate(void);
-extern int SDL_HelperWindowDestroy(void);
 #endif
 
 #ifdef SDL_BUILD_MAJOR_VERSION
@@ -86,21 +66,7 @@ SDL_COMPILE_TIME_ASSERT(SDL_PATCHLEVEL_max, SDL_PATCHLEVEL <= 99);
 extern SDL_NORETURN void SDL_ExitProcess(int exitcode);
 SDL_NORETURN void SDL_ExitProcess(int exitcode)
 {
-#if defined(__WIN32__) || defined(__GDK__)
-    /* "if you do not know the state of all threads in your process, it is
-       better to call TerminateProcess than ExitProcess"
-       https://msdn.microsoft.com/en-us/library/windows/desktop/ms682658(v=vs.85).aspx */
-    TerminateProcess(GetCurrentProcess(), exitcode);
-    /* MingW doesn't have TerminateProcess marked as noreturn, so add an
-       ExitProcess here that will never be reached but make MingW happy. */
-    ExitProcess(exitcode);
-#elif defined(__EMSCRIPTEN__)
-    emscripten_cancel_main_loop();  /* this should "kill" the app. */
-    emscripten_force_exit(exitcode);  /* this should "kill" the app. */
-    exit(exitcode);
-#elif defined(__HAIKU__)  /* Haiku has _Exit, but it's not marked noreturn. */
-    _exit(exitcode);
-#elif defined(HAVE__EXIT) /* Upper case _Exit() */
+#if   defined(HAVE__EXIT) /* Upper case _Exit() */
     _Exit(exitcode);
 #else
     _exit(exitcode);
@@ -233,7 +199,6 @@ SDL_InitSubSystem(Uint32 flags)
 
     /* Initialize the video subsystem */
     if ((flags & SDL_INIT_VIDEO)){
-#if !SDL_VIDEO_DISABLED
         if (SDL_PrivateShouldInitSubsystem(SDL_INIT_VIDEO)) {
             if (SDL_VideoInit(NULL) < 0) {
                 goto quit_and_error;
@@ -241,10 +206,6 @@ SDL_InitSubSystem(Uint32 flags)
         }
         SDL_PrivateSubsystemRefCountIncr(SDL_INIT_VIDEO);
         flags_initialized |= SDL_INIT_VIDEO;
-#else
-        SDL_SetError("SDL not built with video support");
-        goto quit_and_error;
-#endif
     }
 
     /* Initialize the audio subsystem */
@@ -294,7 +255,6 @@ SDL_QuitSubSystem(Uint32 flags)
     }
 #endif
 
-#if !SDL_VIDEO_DISABLED
     if ((flags & SDL_INIT_VIDEO)) {
         /* video implies events */
         flags |= SDL_INIT_EVENTS;
@@ -304,7 +264,6 @@ SDL_QuitSubSystem(Uint32 flags)
         }
         SDL_PrivateSubsystemRefCountDecr(SDL_INIT_VIDEO);
     }
-#endif
 
 #if !SDL_TIMERS_DISABLED && !SDL_TIMER_DUMMY
     if ((flags & SDL_INIT_TIMER)) {
@@ -362,9 +321,6 @@ SDL_Quit(void)
     SDL_bInMainQuit = SDL_TRUE;
 
     /* Quit all subsystems */
-#if SDL_VIDEO_DRIVER_WINDOWS
-    SDL_HelperWindowDestroy();
-#endif
     SDL_QuitSubSystem(SDL_INIT_EVERYTHING);
 
 #if !SDL_TIMERS_DISABLED
@@ -435,18 +391,12 @@ SDL_GetPlatform(void)
 {
 #if __AIX__
     return "AIX";
-#elif __ANDROID__
-    return "Android";
 #elif __BSDI__
     return "BSDI";
 #elif __DREAMCAST__
     return "Dreamcast";
-#elif __EMSCRIPTEN__
-    return "Emscripten";
 #elif __FREEBSD__
     return "FreeBSD";
-#elif __HAIKU__
-    return "Haiku";
 #elif __HPUX__
     return "HP-UX";
 #elif __IRIX__
@@ -457,48 +407,18 @@ SDL_GetPlatform(void)
     return "Atari MiNT";
 #elif __MACOS__
     return "MacOS Classic";
-#elif __MACOSX__
-    return "Mac OS X";
-#elif __NACL__
-    return "NaCl";
 #elif __NETBSD__
     return "NetBSD";
 #elif __OPENBSD__
     return "OpenBSD";
-#elif __OS2__
-    return "OS/2";
 #elif __OSF__
     return "OSF/1";
 #elif __QNXNTO__
     return "QNX Neutrino";
-#elif __RISCOS__
-    return "RISC OS";
-#elif __SOLARIS__
-    return "Solaris";
-#elif __WIN32__
-    return "Windows";
-#elif __WINRT__
-    return "WinRT";
-#elif __WINGDK__
-    return "WinGDK";
-#elif __XBOXONE__
-    return "Xbox One";
-#elif __XBOXSERIES__
-    return "Xbox Series X|S";
 #elif __TVOS__
     return "tvOS";
-#elif __IPHONEOS__
-    return "iOS";
-#elif __PS2__
-    return "PlayStation 2";
 #elif __PSP__
     return "PlayStation Portable";
-#elif __VITA__
-    return "PlayStation Vita";
-#elif __NGAGE__
-    return "Nokia N-Gage";
-#elif __3DS__
-    return "Nintendo 3DS";
 #else
     return "Unknown (see SDL_platform.h)";
 #endif
@@ -507,37 +427,7 @@ SDL_GetPlatform(void)
 SDL_bool
 SDL_IsTablet(void)
 {
-#if __ANDROID__
-    extern SDL_bool SDL_IsAndroidTablet(void);
-    return SDL_IsAndroidTablet();
-#elif __IPHONEOS__
-    extern SDL_bool SDL_IsIPad(void);
-    return SDL_IsIPad();
-#else
     return SDL_FALSE;
-#endif
 }
-
-#if defined(__WIN32__)
-
-#if (!defined(HAVE_LIBC) || defined(__WATCOMC__)) && !defined(SDL_STATIC_LIB)
-/* Need to include DllMain() on Watcom C for some reason.. */
-
-BOOL APIENTRY
-_DllMainCRTStartup(HANDLE hModule,
-                   DWORD ul_reason_for_call, LPVOID lpReserved)
-{
-    switch (ul_reason_for_call) {
-    case DLL_PROCESS_ATTACH:
-    case DLL_THREAD_ATTACH:
-    case DLL_THREAD_DETACH:
-    case DLL_PROCESS_DETACH:
-        break;
-    }
-    return TRUE;
-}
-#endif /* Building DLL */
-
-#endif /* defined(__WIN32__) || defined(__GDK__) */
 
 /* vi: set sts=4 ts=4 sw=4 expandtab: */

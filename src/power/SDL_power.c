@@ -50,32 +50,8 @@ static SDL_GetPowerInfo_Impl implementations[] = {
     SDL_GetPowerInfo_Linux_proc_acpi,
     SDL_GetPowerInfo_Linux_proc_apm,
 #endif
-#ifdef SDL_POWER_WINDOWS        /* handles Win32, Win64, PocketPC. */
-    SDL_GetPowerInfo_Windows,
-#endif
-#ifdef SDL_POWER_UIKIT          /* handles iPhone/iPad/etc */
-    SDL_GetPowerInfo_UIKit,
-#endif
-#ifdef SDL_POWER_MACOSX         /* handles Mac OS X, Darwin. */
-    SDL_GetPowerInfo_MacOSX,
-#endif
-#ifdef SDL_POWER_HAIKU          /* with BeOS euc.jp apm driver. Does this work on Haiku? */
-    SDL_GetPowerInfo_Haiku,
-#endif
 #ifdef SDL_POWER_ANDROID        /* handles Android. */
     SDL_GetPowerInfo_Android,
-#endif
-#ifdef SDL_POWER_PSP        /* handles PSP. */
-    SDL_GetPowerInfo_PSP,
-#endif
-#ifdef SDL_POWER_VITA        /* handles PSVita. */
-    SDL_GetPowerInfo_VITA,
-#endif
-#ifdef SDL_POWER_N3DS        /* handles N3DS. */
-    SDL_GetPowerInfo_N3DS,
-#endif
-#ifdef SDL_POWER_WINRT          /* handles WinRT */
-    SDL_GetPowerInfo_WinRT,
 #endif
 #ifdef SDL_POWER_EMSCRIPTEN     /* handles Emscripten */
     SDL_GetPowerInfo_Emscripten,

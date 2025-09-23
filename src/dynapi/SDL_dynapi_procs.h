@@ -48,41 +48,12 @@ SDL_DYNAPI_PROC(int,SDL_snprintf,(SDL_OUT_Z_CAP(b) char *a, size_t b, SDL_PRINTF
 #undef SDL_CreateThread
 #endif
 
-#if defined(__WIN32__) || defined(__GDK__)
-SDL_DYNAPI_PROC(SDL_Thread*,SDL_CreateThread,(SDL_ThreadFunction a, const char *b, void *c, pfnSDL_CurrentBeginThread d, pfnSDL_CurrentEndThread e),(a,b,c,d,e),return)
-#elif defined(__OS2__)
-SDL_DYNAPI_PROC(SDL_Thread*,SDL_CreateThread,(SDL_ThreadFunction a, const char *b, void *c, pfnSDL_CurrentBeginThread d, pfnSDL_CurrentEndThread e),(a,b,c,d,e),return)
-#else
 SDL_DYNAPI_PROC(SDL_Thread*,SDL_CreateThread,(SDL_ThreadFunction a, const char *b, void *c),(a,b,c),return)
-#endif
 
 #ifdef HAVE_STDIO_H
 SDL_DYNAPI_PROC(SDL_RWops*,SDL_RWFromFP,(FILE *a, SDL_bool b),(a,b),return)
 #else
 SDL_DYNAPI_PROC(SDL_RWops*,SDL_RWFromFP,(void *a, SDL_bool b),(a,b),return)
-#endif
-
-#if defined(__WIN32__) || defined(__GDK__)
-SDL_DYNAPI_PROC(int,SDL_RegisterApp,(const char *a, Uint32 b, void *c),(a,b,c),return)
-SDL_DYNAPI_PROC(void,SDL_UnregisterApp,(void),(),)
-#endif
-
-#if defined(__WIN32__) || defined(__WINGDK__)
-SDL_DYNAPI_PROC(int,SDL_Direct3D9GetAdapterIndex,(int a),(a),return)
-SDL_DYNAPI_PROC(IDirect3DDevice9*,SDL_RenderGetD3D9Device,(SDL_Renderer *a),(a),return)
-#endif
-
-#ifdef __IPHONEOS__
-SDL_DYNAPI_PROC(int,SDL_iPhoneSetAnimationCallback,(SDL_Window *a, int b, void (SDLCALL *c)(void *), void *d),(a,b,c,d),return)
-SDL_DYNAPI_PROC(void,SDL_iPhoneSetEventPump,(SDL_bool a),(a),)
-#endif
-
-#ifdef __ANDROID__
-SDL_DYNAPI_PROC(void*,SDL_AndroidGetJNIEnv,(void),(),return)
-SDL_DYNAPI_PROC(void*,SDL_AndroidGetActivity,(void),(),return)
-SDL_DYNAPI_PROC(const char*,SDL_AndroidGetInternalStoragePath,(void),(),return)
-SDL_DYNAPI_PROC(int,SDL_AndroidGetExternalStorageState,(void),(),return)
-SDL_DYNAPI_PROC(const char*,SDL_AndroidGetExternalStoragePath,(void),(),return)
 #endif
 
 SDL_DYNAPI_PROC(int,SDL_Init,(Uint32 a),(a),return)
@@ -771,12 +742,6 @@ SDL_DYNAPI_PROC(void,SDL_OnApplicationWillResignActive,(void),(),)
 SDL_DYNAPI_PROC(void,SDL_OnApplicationDidEnterBackground,(void),(),)
 SDL_DYNAPI_PROC(void,SDL_OnApplicationWillEnterForeground,(void),(),)
 SDL_DYNAPI_PROC(void,SDL_OnApplicationDidBecomeActive,(void),(),)
-#ifdef __IPHONEOS__
-SDL_DYNAPI_PROC(void,SDL_OnApplicationDidChangeStatusBarOrientation,(void),(),)
-#endif
-#ifdef __ANDROID__
-SDL_DYNAPI_PROC(int,SDL_GetAndroidSDKVersion,(void),(),return)
-#endif
 SDL_DYNAPI_PROC(int,SDL_isupper,(int a),(a),return)
 SDL_DYNAPI_PROC(int,SDL_islower,(int a),(a),return)
 SDL_DYNAPI_PROC(int,SDL_JoystickAttachVirtual,(SDL_JoystickType a, int b, int c, int d),(a,b,c,d),return)
@@ -794,9 +759,6 @@ SDL_DYNAPI_PROC(double,SDL_trunc,(double a),(a),return)
 SDL_DYNAPI_PROC(float,SDL_truncf,(float a),(a),return)
 SDL_DYNAPI_PROC(SDL_Locale *,SDL_GetPreferredLocales,(void),(),return)
 SDL_DYNAPI_PROC(void*,SDL_SIMDRealloc,(void *a, const size_t b),(a, b),return)
-#ifdef __ANDROID__
-SDL_DYNAPI_PROC(SDL_bool,SDL_AndroidRequestPermission,(const char *a),(a),return)
-#endif
 SDL_DYNAPI_PROC(int,SDL_OpenURL,(const char *a),(a),return)
 SDL_DYNAPI_PROC(SDL_bool,SDL_HasSurfaceRLE,(SDL_Surface *a),(a),return)
 SDL_DYNAPI_PROC(SDL_bool,SDL_GameControllerHasLED,(SDL_GameController *a),(a),return)

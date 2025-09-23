@@ -30,12 +30,6 @@
 
 #include "SDL_config.h"
 
-#ifdef __APPLE__
-#ifndef _DARWIN_C_SOURCE
-#define _DARWIN_C_SOURCE 1 /* for memset_pattern4() */
-#endif
-#endif
-
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
@@ -80,13 +74,6 @@
 # include <ctype.h>
 #endif
 #ifdef HAVE_MATH_H
-# if defined(_MSC_VER)
-/* Defining _USE_MATH_DEFINES is required to get M_PI to be defined on
-   Visual Studio.  See http://msdn.microsoft.com/en-us/library/4hwaceh6.aspx
-   for more information.
-*/
-#  define _USE_MATH_DEFINES
-# endif
 # include <math.h>
 #endif
 #ifdef HAVE_FLOAT_H
@@ -97,13 +84,6 @@
 #  include <alloca.h>
 # elif defined(__GNUC__)
 #  define alloca __builtin_alloca
-# elif defined(_MSC_VER)
-#  include <malloc.h>
-#  define alloca _alloca
-# elif defined(__WATCOMC__)
-#  include <malloc.h>
-# elif defined(__BORLANDC__)
-#  include <malloc.h>
 # elif defined(__DMC__)
 #  include <stdlib.h>
 # elif defined(__AIX__)
@@ -259,8 +239,6 @@ typedef uint64_t Uint64;
 #ifndef SDL_PRIs64
 #ifdef PRIs64
 #define SDL_PRIs64 PRIs64
-#elif defined(__WIN32__) || defined(__GDK__)
-#define SDL_PRIs64 "I64d"
 #elif defined(__LINUX__) && defined(__LP64__)
 #define SDL_PRIs64 "ld"
 #else
@@ -270,8 +248,6 @@ typedef uint64_t Uint64;
 #ifndef SDL_PRIu64
 #ifdef PRIu64
 #define SDL_PRIu64 PRIu64
-#elif defined(__WIN32__) || defined(__GDK__)
-#define SDL_PRIu64 "I64u"
 #elif defined(__LINUX__) && defined(__LP64__)
 #define SDL_PRIu64 "lu"
 #else
@@ -281,8 +257,6 @@ typedef uint64_t Uint64;
 #ifndef SDL_PRIx64
 #ifdef PRIx64
 #define SDL_PRIx64 PRIx64
-#elif defined(__WIN32__) || defined(__GDK__)
-#define SDL_PRIx64 "I64x"
 #elif defined(__LINUX__) && defined(__LP64__)
 #define SDL_PRIx64 "lx"
 #else
@@ -292,8 +266,6 @@ typedef uint64_t Uint64;
 #ifndef SDL_PRIX64
 #ifdef PRIX64
 #define SDL_PRIX64 PRIX64
-#elif defined(__WIN32__) || defined(__GDK__)
-#define SDL_PRIX64 "I64X"
 #elif defined(__LINUX__) && defined(__LP64__)
 #define SDL_PRIX64 "lX"
 #else
@@ -342,19 +314,6 @@ typedef uint64_t Uint64;
 #define SDL_PRINTF_VARARG_FUNC( fmtargnumber )
 #define SDL_SCANF_VARARG_FUNC( fmtargnumber )
 #else
-#if defined(_MSC_VER) && (_MSC_VER >= 1600) /* VS 2010 and above */
-#include <sal.h>
-
-#define SDL_IN_BYTECAP(x) _In_bytecount_(x)
-#define SDL_INOUT_Z_CAP(x) _Inout_z_cap_(x)
-#define SDL_OUT_Z_CAP(x) _Out_z_cap_(x)
-#define SDL_OUT_CAP(x) _Out_cap_(x)
-#define SDL_OUT_BYTECAP(x) _Out_bytecap_(x)
-#define SDL_OUT_Z_BYTECAP(x) _Out_z_bytecap_(x)
-
-#define SDL_PRINTF_FORMAT_STRING _Printf_format_string_
-#define SDL_SCANF_FORMAT_STRING _Scanf_format_string_impl_
-#else
 #define SDL_IN_BYTECAP(x)
 #define SDL_INOUT_Z_CAP(x)
 #define SDL_OUT_Z_CAP(x)
@@ -363,7 +322,6 @@ typedef uint64_t Uint64;
 #define SDL_OUT_Z_BYTECAP(x)
 #define SDL_PRINTF_FORMAT_STRING
 #define SDL_SCANF_FORMAT_STRING
-#endif
 #if defined(__GNUC__)
 #define SDL_PRINTF_VARARG_FUNC( fmtargnumber ) __attribute__ (( format( __printf__, fmtargnumber, fmtargnumber+1 )))
 #define SDL_SCANF_VARARG_FUNC( fmtargnumber ) __attribute__ (( format( __scanf__, fmtargnumber, fmtargnumber+1 )))
@@ -410,7 +368,6 @@ SDL_COMPILE_TIME_ASSERT(sint64, sizeof(Sint64) == 8);
 
 /** \cond */
 #ifndef DOXYGEN_SHOULD_IGNORE_THIS
-#if !defined(__ANDROID__) && !defined(__VITA__) && !defined(__3DS__)
    /* TODO: include/SDL_stdinc.h:174: error: size of array 'SDL_dummy_enum' is negative */
 typedef enum
 {
@@ -418,7 +375,6 @@ typedef enum
 } SDL_DUMMY_ENUM;
 
 SDL_COMPILE_TIME_ASSERT(enum, sizeof(SDL_DUMMY_ENUM) == sizeof(int));
-#endif
 #endif /* DOXYGEN_SHOULD_IGNORE_THIS */
 /** \endcond */
 
@@ -528,18 +484,6 @@ extern DECLSPEC void *SDLCALL SDL_memset(SDL_OUT_BYTECAP(len) void *dst, int c, 
 /* Note that memset() is a byte assignment and this is a 32-bit assignment, so they're not directly equivalent. */
 SDL_FORCE_INLINE void SDL_memset4(void *dst, Uint32 val, size_t dwords)
 {
-#ifdef __APPLE__
-    memset_pattern4(dst, &val, dwords * 4);
-#elif defined(__GNUC__) && defined(__i386__)
-    int u0, u1, u2;
-    __asm__ __volatile__ (
-        "cld \n\t"
-        "rep ; stosl \n\t"
-        : "=&D" (u0), "=&a" (u1), "=&c" (u2)
-        : "0" (dst), "1" (val), "2" (SDL_static_cast(Uint32, dwords))
-        : "memory"
-    );
-#else
     size_t _n = (dwords + 3) / 4;
     Uint32 *_p = SDL_static_cast(Uint32 *, dst);
     Uint32 _val = (val);
@@ -553,7 +497,6 @@ SDL_FORCE_INLINE void SDL_memset4(void *dst, Uint32 val, size_t dwords)
         case 1:         *_p++ = _val;
         } while ( --_n );
     }
-#endif
 }
 
 extern DECLSPEC void *SDLCALL SDL_memcpy(SDL_OUT_BYTECAP(len) void *dst, SDL_IN_BYTECAP(len) const void *src, size_t len);

@@ -208,16 +208,6 @@ SDL_GetBasePath(void)
         SDL_free(cmdline);
     }
 #endif
-#if defined(__SOLARIS__)
-    const char *path = getexecname();
-    if ((path != NULL) && (path[0] == '/')) { /* must be absolute path... */
-        retval = SDL_strdup(path);
-        if (!retval) {
-            SDL_OutOfMemory();
-            return NULL;
-        }
-    }
-#endif
 
     /* is a Linux-style /proc filesystem available? */
     if (!retval && (access("/proc", F_OK) == 0)) {

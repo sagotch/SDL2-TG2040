@@ -30,23 +30,6 @@
 
 #include "SDL_stdinc.h"
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1400)
-/* As of Clang 11, '_m_prefetchw' is conflicting with the winnt.h's version,
-   so we define the needed '_m_prefetch' here as a pseudo-header, until the issue is fixed. */
-#ifdef __clang__
-#ifndef __PRFCHWINTRIN_H
-#define __PRFCHWINTRIN_H
-static __inline__ void __attribute__((__always_inline__, __nodebug__))
-_m_prefetch(void *__P)
-{
-  __builtin_prefetch(__P, 0, 3 /* _MM_HINT_T0 */);
-}
-#endif /* __PRFCHWINTRIN_H */
-#endif /* __clang__ */
-
-#include <intrin.h>
-#endif
-
 /**
  *  \name The two types of endianness
  */
@@ -59,9 +42,6 @@ _m_prefetch(void *__P)
 #ifdef __linux__
 #include <endian.h>
 #define SDL_BYTEORDER  __BYTE_ORDER
-#elif defined(__OpenBSD__) || defined(__DragonFly__)
-#include <endian.h>
-#define SDL_BYTEORDER  BYTE_ORDER
 #elif defined(__FreeBSD__) || defined(__NetBSD__)
 #include <sys/endian.h>
 #define SDL_BYTEORDER  BYTE_ORDER
@@ -140,23 +120,6 @@ extern "C" {
 
 #if HAS_BUILTIN_BSWAP16
 #define SDL_Swap16(x) __builtin_bswap16(x)
-#elif defined(_MSC_VER) && (_MSC_VER >= 1400)
-#pragma intrinsic(_byteswap_ushort)
-#define SDL_Swap16(x) _byteswap_ushort(x)
-#elif defined(__i386__) && !HAS_BROKEN_BSWAP
-SDL_FORCE_INLINE Uint16
-SDL_Swap16(Uint16 x)
-{
-  __asm__("xchgb %b0,%h0": "=q"(x):"0"(x));
-    return x;
-}
-#elif defined(__x86_64__)
-SDL_FORCE_INLINE Uint16
-SDL_Swap16(Uint16 x)
-{
-  __asm__("xchgb %b0,%h0": "=Q"(x):"0"(x));
-    return x;
-}
 #elif (defined(__powerpc__) || defined(__ppc__))
 SDL_FORCE_INLINE Uint16
 SDL_Swap16(Uint16 x)
@@ -173,12 +136,6 @@ SDL_Swap16(Uint16 x)
   __asm__("rorw #8,%0": "=d"(x): "0"(x):"cc");
     return x;
 }
-#elif defined(__WATCOMC__) && defined(__386__)
-extern __inline Uint16 SDL_Swap16(Uint16);
-#pragma aux SDL_Swap16 = \
-  "xchg al, ah" \
-  parm   [ax]   \
-  modify [ax];
 #else
 SDL_FORCE_INLINE Uint16
 SDL_Swap16(Uint16 x)
@@ -189,23 +146,6 @@ SDL_Swap16(Uint16 x)
 
 #if HAS_BUILTIN_BSWAP32
 #define SDL_Swap32(x) __builtin_bswap32(x)
-#elif defined(_MSC_VER) && (_MSC_VER >= 1400)
-#pragma intrinsic(_byteswap_ulong)
-#define SDL_Swap32(x) _byteswap_ulong(x)
-#elif defined(__i386__) && !HAS_BROKEN_BSWAP
-SDL_FORCE_INLINE Uint32
-SDL_Swap32(Uint32 x)
-{
-  __asm__("bswap %0": "=r"(x):"0"(x));
-    return x;
-}
-#elif defined(__x86_64__)
-SDL_FORCE_INLINE Uint32
-SDL_Swap32(Uint32 x)
-{
-  __asm__("bswapl %0": "=r"(x):"0"(x));
-    return x;
-}
 #elif (defined(__powerpc__) || defined(__ppc__))
 SDL_FORCE_INLINE Uint32
 SDL_Swap32(Uint32 x)
@@ -224,12 +164,6 @@ SDL_Swap32(Uint32 x)
   __asm__("rorw #8,%0\n\tswap %0\n\trorw #8,%0": "=d"(x): "0"(x):"cc");
     return x;
 }
-#elif defined(__WATCOMC__) && defined(__386__)
-extern __inline Uint32 SDL_Swap32(Uint32);
-#pragma aux SDL_Swap32 = \
-  "bswap eax"  \
-  parm   [eax] \
-  modify [eax];
 #else
 SDL_FORCE_INLINE Uint32
 SDL_Swap32(Uint32 x)
@@ -241,40 +175,6 @@ SDL_Swap32(Uint32 x)
 
 #if HAS_BUILTIN_BSWAP64
 #define SDL_Swap64(x) __builtin_bswap64(x)
-#elif defined(_MSC_VER) && (_MSC_VER >= 1400)
-#pragma intrinsic(_byteswap_uint64)
-#define SDL_Swap64(x) _byteswap_uint64(x)
-#elif defined(__i386__) && !HAS_BROKEN_BSWAP
-SDL_FORCE_INLINE Uint64
-SDL_Swap64(Uint64 x)
-{
-    union {
-        struct {
-            Uint32 a, b;
-        } s;
-        Uint64 u;
-    } v;
-    v.u = x;
-  __asm__("bswapl %0 ; bswapl %1 ; xchgl %0,%1"
-          : "=r"(v.s.a), "=r"(v.s.b)
-          : "0" (v.s.a),  "1"(v.s.b));
-    return v.u;
-}
-#elif defined(__x86_64__)
-SDL_FORCE_INLINE Uint64
-SDL_Swap64(Uint64 x)
-{
-  __asm__("bswapq %0": "=r"(x):"0"(x));
-    return x;
-}
-#elif defined(__WATCOMC__) && defined(__386__)
-extern __inline Uint64 SDL_Swap64(Uint64);
-#pragma aux SDL_Swap64 = \
-  "bswap eax"     \
-  "bswap edx"     \
-  "xchg eax,edx"  \
-  parm [eax edx]  \
-  modify [eax edx];
 #else
 SDL_FORCE_INLINE Uint64
 SDL_Swap64(Uint64 x)

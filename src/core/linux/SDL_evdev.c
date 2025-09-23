@@ -132,24 +132,6 @@ SDL_EVDEV_Init(void)
             return SDL_OutOfMemory();
         }
 
-#if SDL_USE_LIBUDEV
-        if (SDL_UDEV_Init() < 0) {
-            SDL_free(_this);
-            _this = NULL;
-            return -1;
-        }
-
-        /* Set up the udev callback */
-        if (SDL_UDEV_AddCallback(SDL_EVDEV_udev_callback) < 0) {
-            SDL_UDEV_Quit();
-            SDL_free(_this);
-            _this = NULL;
-            return -1;
-        }
-
-        /* Force a scan to build the initial device list */
-        SDL_UDEV_Scan();
-#else
         {
             /* Allow the user to specify a list of devices explicitly of
                the form:
@@ -174,7 +156,6 @@ SDL_EVDEV_Init(void)
                 /* TODO: Scan the devices manually, like a caveman */
             }
         }
-#endif /* SDL_USE_LIBUDEV */
 
         _this->kbd = SDL_EVDEV_kbd_init();
     }
@@ -194,10 +175,6 @@ SDL_EVDEV_Quit(void)
     _this->ref_count -= 1;
 
     if (_this->ref_count < 1) {
-#if SDL_USE_LIBUDEV
-        SDL_UDEV_DelCallback(SDL_EVDEV_udev_callback);
-        SDL_UDEV_Quit();
-#endif /* SDL_USE_LIBUDEV */
 
         SDL_EVDEV_kbd_quit(_this->kbd);
 
@@ -214,33 +191,6 @@ SDL_EVDEV_Quit(void)
         _this = NULL;
     }
 }
-
-#if SDL_USE_LIBUDEV
-static void SDL_EVDEV_udev_callback(SDL_UDEV_deviceevent udev_event, int udev_class,
-    const char* dev_path)
-{
-    if (dev_path == NULL) {
-        return;
-    }
-
-    switch(udev_event) {
-    case SDL_UDEV_DEVICEADDED:
-        if (!(udev_class & (SDL_UDEV_DEVICE_MOUSE | SDL_UDEV_DEVICE_KEYBOARD | SDL_UDEV_DEVICE_TOUCHSCREEN | SDL_UDEV_DEVICE_TOUCHPAD)))
-            return;
-
-        if ((udev_class & SDL_UDEV_DEVICE_JOYSTICK))
-            return;
-
-        SDL_EVDEV_device_added(dev_path, udev_class);
-        break;  
-    case SDL_UDEV_DEVICEREMOVED:
-        SDL_EVDEV_device_removed(dev_path);
-        break;
-    default:
-        break;
-    }
-}
-#endif /* SDL_USE_LIBUDEV */
 
 void 
 SDL_EVDEV_Poll(void)

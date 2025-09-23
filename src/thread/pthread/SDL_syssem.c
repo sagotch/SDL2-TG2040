@@ -31,11 +31,6 @@
 
 /* Wrapper around POSIX 1003.1b semaphores */
 
-#if defined(__MACOSX__) || defined(__IPHONEOS__)
-/* Mac OS X doesn't support sem_getvalue() as of version 10.4 */
-#include "../generic/SDL_syssem.c"
-#else
-
 struct SDL_semaphore
 {
     sem_t sem;
@@ -205,5 +200,4 @@ SDL_SemPost(SDL_sem * sem)
     return retval;
 }
 
-#endif /* __MACOSX__ */
 /* vi: set ts=4 sw=4 expandtab: */

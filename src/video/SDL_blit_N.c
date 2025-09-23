@@ -49,45 +49,17 @@ enum blit_features {
 };
 
 #if SDL_ALTIVEC_BLITTERS
-#ifdef HAVE_ALTIVEC_H
-#include <altivec.h>
-#endif
-#ifdef __MACOSX__
-#include <sys/sysctl.h>
-static size_t
-GetL3CacheSize(void)
-{
-    const char key[] = "hw.l3cachesize";
-    u_int64_t result = 0;
-    size_t typeSize = sizeof(result);
-
-
-    int err = sysctlbyname(key, &result, &typeSize, NULL, 0);
-    if (0 != err)
-        return 0;
-
-    return result;
-}
-#else
 static size_t
 GetL3CacheSize(void)
 {
     /* XXX: Just guess G4 */
     return 2097152;
 }
-#endif /* __MACOSX__ */
 
-#if (defined(__MACOSX__) && (__GNUC__ < 4))
-#define VECUINT8_LITERAL(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) \
-        (vector unsigned char) ( a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p )
-#define VECUINT16_LITERAL(a,b,c,d,e,f,g,h) \
-        (vector unsigned short) ( a,b,c,d,e,f,g,h )
-#else
 #define VECUINT8_LITERAL(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) \
         (vector unsigned char) { a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p }
 #define VECUINT16_LITERAL(a,b,c,d,e,f,g,h) \
         (vector unsigned short) { a,b,c,d,e,f,g,h }
-#endif
 
 #define UNALIGNED_PTR(x) (((size_t) x) & 0x0000000F)
 #define VSWIZZLE32(a,b,c,d) (vector unsigned char) \

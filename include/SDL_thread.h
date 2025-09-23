@@ -35,17 +35,6 @@
 #include "SDL_atomic.h"
 #include "SDL_mutex.h"
 
-#if defined(__WIN32__) || defined(__GDK__)
-#include <process.h> /* _beginthreadex() and _endthreadex() */
-#endif
-#if defined(__OS2__) /* for _beginthread() and _endthread() */
-#ifndef __EMX__
-#include <process.h>
-#else
-#include <stdlib.h>
-#endif
-#endif
-
 #include "begin_code.h"
 /* Set up for C function definitions, even when using C++ */
 #ifdef __cplusplus
@@ -87,101 +76,6 @@ typedef enum {
  */
 typedef int (SDLCALL * SDL_ThreadFunction) (void *data);
 
-
-#if defined(__WIN32__) || defined(__GDK__)
-/**
- *  \file SDL_thread.h
- *
- *  We compile SDL into a DLL. This means, that it's the DLL which
- *  creates a new thread for the calling process with the SDL_CreateThread()
- *  API. There is a problem with this, that only the RTL of the SDL2.DLL will
- *  be initialized for those threads, and not the RTL of the calling
- *  application!
- *
- *  To solve this, we make a little hack here.
- *
- *  We'll always use the caller's _beginthread() and _endthread() APIs to
- *  start a new thread. This way, if it's the SDL2.DLL which uses this API,
- *  then the RTL of SDL2.DLL will be used to create the new thread, and if it's
- *  the application, then the RTL of the application will be used.
- *
- *  So, in short:
- *  Always use the _beginthread() and _endthread() of the calling runtime
- *  library!
- */
-#define SDL_PASSED_BEGINTHREAD_ENDTHREAD
-
-typedef uintptr_t (__cdecl * pfnSDL_CurrentBeginThread)
-                   (void *, unsigned, unsigned (__stdcall *func)(void *),
-                    void * /*arg*/, unsigned, unsigned * /* threadID */);
-typedef void (__cdecl * pfnSDL_CurrentEndThread) (unsigned code);
-
-#ifndef SDL_beginthread
-#define SDL_beginthread _beginthreadex
-#endif
-#ifndef SDL_endthread
-#define SDL_endthread _endthreadex
-#endif
-
-extern DECLSPEC SDL_Thread *SDLCALL
-SDL_CreateThread(SDL_ThreadFunction fn, const char *name, void *data,
-                 pfnSDL_CurrentBeginThread pfnBeginThread,
-                 pfnSDL_CurrentEndThread pfnEndThread);
-
-extern DECLSPEC SDL_Thread *SDLCALL
-SDL_CreateThreadWithStackSize(SDL_ThreadFunction fn,
-                 const char *name, const size_t stacksize, void *data,
-                 pfnSDL_CurrentBeginThread pfnBeginThread,
-                 pfnSDL_CurrentEndThread pfnEndThread);
-
-
-#if defined(SDL_CreateThread) && SDL_DYNAMIC_API
-#undef SDL_CreateThread
-#define SDL_CreateThread(fn, name, data) SDL_CreateThread_REAL(fn, name, data, (pfnSDL_CurrentBeginThread)SDL_beginthread, (pfnSDL_CurrentEndThread)SDL_endthread)
-#undef SDL_CreateThreadWithStackSize
-#define SDL_CreateThreadWithStackSize(fn, name, stacksize, data) SDL_CreateThreadWithStackSize_REAL(fn, name, stacksize, data, (pfnSDL_CurrentBeginThread)SDL_beginthread, (pfnSDL_CurrentEndThread)SDL_endthread)
-#else
-#define SDL_CreateThread(fn, name, data) SDL_CreateThread(fn, name, data, (pfnSDL_CurrentBeginThread)SDL_beginthread, (pfnSDL_CurrentEndThread)SDL_endthread)
-#define SDL_CreateThreadWithStackSize(fn, name, stacksize, data) SDL_CreateThreadWithStackSize(fn, name, stacksize, data, (pfnSDL_CurrentBeginThread)SDL_beginthread, (pfnSDL_CurrentEndThread)SDL_endthread)
-#endif
-
-#elif defined(__OS2__)
-/*
- * just like the windows case above:  We compile SDL2
- * into a dll with Watcom's runtime statically linked.
- */
-#define SDL_PASSED_BEGINTHREAD_ENDTHREAD
-
-typedef int (*pfnSDL_CurrentBeginThread)(void (*func)(void *), void *, unsigned, void * /*arg*/);
-typedef void (*pfnSDL_CurrentEndThread)(void);
-
-#ifndef SDL_beginthread
-#define SDL_beginthread _beginthread
-#endif
-#ifndef SDL_endthread
-#define SDL_endthread _endthread
-#endif
-
-extern DECLSPEC SDL_Thread *SDLCALL
-SDL_CreateThread(SDL_ThreadFunction fn, const char *name, void *data,
-                 pfnSDL_CurrentBeginThread pfnBeginThread,
-                 pfnSDL_CurrentEndThread pfnEndThread);
-extern DECLSPEC SDL_Thread *SDLCALL
-SDL_CreateThreadWithStackSize(SDL_ThreadFunction fn, const char *name, const size_t stacksize, void *data,
-                 pfnSDL_CurrentBeginThread pfnBeginThread,
-                 pfnSDL_CurrentEndThread pfnEndThread);
-
-#if defined(SDL_CreateThread) && SDL_DYNAMIC_API
-#undef SDL_CreateThread
-#define SDL_CreateThread(fn, name, data) SDL_CreateThread_REAL(fn, name, data, (pfnSDL_CurrentBeginThread)SDL_beginthread, (pfnSDL_CurrentEndThread)SDL_endthread)
-#undef SDL_CreateThreadWithStackSize
-#define SDL_CreateThreadWithStackSize(fn, name, stacksize, data) SDL_CreateThreadWithStackSize_REAL(fn, name, stacksize, data, (pfnSDL_CurrentBeginThread)SDL_beginthread, (pfnSDL_CurrentEndThread)SDL_endthread)
-#else
-#define SDL_CreateThread(fn, name, data) SDL_CreateThread(fn, name, data, (pfnSDL_CurrentBeginThread)SDL_beginthread, (pfnSDL_CurrentEndThread)SDL_endthread)
-#define SDL_CreateThreadWithStackSize(fn, name, stacksize, data) SDL_CreateThreadWithStackSize(fn, name, stacksize, data, (pfnSDL_CurrentBeginThread)SDL_beginthread, (pfnSDL_CurrentEndThread)SDL_endthread)
-#endif
-
-#else
 
 /**
  * Create a new thread with a default stack size.
@@ -252,8 +146,6 @@ SDL_CreateThread(SDL_ThreadFunction fn, const char *name, void *data);
  */
 extern DECLSPEC SDL_Thread *SDLCALL
 SDL_CreateThreadWithStackSize(SDL_ThreadFunction fn, const char *name, const size_t stacksize, void *data);
-
-#endif
 
 /**
  * Get the thread name as it was specified in SDL_CreateThread().

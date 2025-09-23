@@ -31,10 +31,6 @@
 #include "SDL_endian.h"
 
 #if defined(HAVE_ICONV) && defined(HAVE_ICONV_H)
-#ifdef __FreeBSD__
-/* Define LIBICONV_PLUG to use iconv from the base instead of ports and avoid linker errors. */
-#define LIBICONV_PLUG 1
-#endif
 #include <iconv.h>
 #include <errno.h>
 
@@ -131,11 +127,7 @@ static struct
     { "US-ASCII", ENCODING_ASCII },
     { "8859-1", ENCODING_LATIN1 },
     { "ISO-8859-1", ENCODING_LATIN1 },
-#if defined(__WIN32__) || defined(__OS2__) || defined(__GDK__)
-    { "WCHAR_T", ENCODING_UTF16LE },
-#else
     { "WCHAR_T", ENCODING_UCS4NATIVE },
-#endif
     { "UTF8", ENCODING_UTF8 },
     { "UTF-8", ENCODING_UTF8 },
     { "UTF16", ENCODING_UTF16 },

@@ -93,24 +93,6 @@ typedef struct SDL_RWops
     Uint32 type;
     union
     {
-#if defined(__ANDROID__)
-        struct
-        {
-            void *asset;
-        } androidio;
-#elif defined(__WIN32__) || defined(__GDK__)
-        struct
-        {
-            SDL_bool append;
-            void *h;
-            struct
-            {
-                void *data;
-                size_t size;
-                size_t left;
-            } buffer;
-        } windowsio;
-#endif
 
 #ifdef HAVE_STDIO_H
         struct
