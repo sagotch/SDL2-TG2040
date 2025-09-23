@@ -3,7 +3,7 @@ if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
 cmake_minimum_required(VERSION 3.0.0)
-project(SDL2 C CXX)
+project(SDL2 C CXX ASM)
 
 # ---------------------------------------------------------------------------
 # Optimization flags for Cortex-A7
